@@ -49,6 +49,7 @@ install qhold.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrapper/qhold
 install qrerun.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrapper/qrerun
 install qrls.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrapper/qrls
 install qstat.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrapper/qstat
+install qsub.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrapper/qsub
 install mpiexec.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrapper/mpiexec
 install generate_pbs_nodefile.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrapper/generate_pbs_nodefile
 
