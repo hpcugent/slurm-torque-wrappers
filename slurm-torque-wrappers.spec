@@ -42,9 +42,15 @@ Torque 6 q-scripts.
 %install
 rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/
-install checkpaths.sh $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/
-install checkpaths_stat.sh $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/
-install functions.sh $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/
+install pbsnodes.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/pbsnodes
+install qalter.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/qalter
+install qdel.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/qdel
+install qhold.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/qhold
+install qrerun.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/qrerun
+install qrls.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/qrls
+install qstat.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/qstat
+install mpiexec.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/mpiexec
+install generate_pbs_nodefile.pl $RPM_BUILD_ROOT/usr/libexec/slurm/wrappers/generate_pbs_nodefile
 
 %clean
 rm -rf %{buildroot}
