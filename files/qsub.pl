@@ -316,7 +316,8 @@ sub make_command
                 push(@command, "-e", $err_path);
             } else {
                 # jobname will be forced
-                my $path = getcwd . "/%x.e%A";
+                my $jobbasename = $job_name ? basename($job_name) : "%j";
+                my $path = getcwd . "/$jobbasename.e%A";
                 $path .= ".%a" if $array;
                 $defaults->{e} = $path;
             }
@@ -327,7 +328,8 @@ sub make_command
             push(@command, "-o", $out_path);
         } else {
             # jobname is forced
-            my $path = getcwd . "/%x.o%A";
+            my $jobbasename = $job_name ? basename($job_name) : "%j";
+            my $path = getcwd . "/$jobbasename.o%A";
             $path .= ".%a" if $array;
             $defaults->{o} = $path;
         }
