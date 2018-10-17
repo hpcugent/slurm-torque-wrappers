@@ -16,8 +16,6 @@ before_script:
   - cd slurm
   - git checkout 17.11.ug
   - cd -
-  - pwd
-  - ls
 script:
   - cp -R files/* slurm/contribs/torque/
   - cd slurm
