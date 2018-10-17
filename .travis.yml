@@ -1,23 +1,7 @@
-sudo: required
-language: c
-dist: xenial
-compiler:
-  - clang
-  - gcc
-cache: ccache
-before_install:
-  - sudo apt-get -qq update
-  - sleep 10
-  - sudo apt-get install libslurm-dev
-before_script:
-  - export PATH=/usr/lib/ccache:$PATH
-  - sudo mount -t tmpfs -o size=1024m tmpfs /tmp
-  - git clone https://github.com/hpcugent/slurm.git
-  - cd slurm
-  - git checkout 17.11.ug
-  - cd -
+language: perl
+perl:
+  - "5.18"
+install:
+      - cpanm -f -n Switch Test::MockModule IPC::Run List::Util File::Basename Pod::Usage
 script:
-  - cp -R files/* slurm/contribs/torque/
-  - cd slurm
-  - ./configure --enable-multiple-slurmd --prefix=/tmp/slurm/ > /dev/null
-  - make -j check > /dev/null
+  - PERL5LIB=files/:files/t prove -v files/t
