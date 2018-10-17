@@ -127,13 +127,13 @@ ok(!($mode & 1 << 2), "no dryrun mode w interactive");
 # no 'get-user-env' (neither for salloc where it belongs but requires root; nor srun)
 is_deeply($defaults, {
     J => 'INTERACTIVE',
-    export => 'USER,HOME',
+    export => 'USER,HOME,TERM',
     'cpu-bind' => 'v,none',
     chdir => $ENV{HOME},
 }, "interactive defaults");
 
 # no 'bash -i'
-$txt = "$salloc -J INTERACTIVE $txt --chdir=$ENV{HOME} --cpu-bind=v,none --export=USER,HOME";
+$txt = "$salloc -J INTERACTIVE $txt --chdir=$ENV{HOME} --cpu-bind=v,none --export=USER,HOME,TERM";
 ($newtxt, $newcommand) = parse_script(undef, $command, $defaults);
 ok(!defined($newtxt), "no text for interactive job");
 is(join(" ", @$newcommand), $txt, "expected command after parse with interactive");
