@@ -293,7 +293,7 @@ sub make_command
     if ($interactive || $fake) {
         $mode |= INTERACTIVE;
         @command = (which(SALLOC));
-        @intcommand = (which('srun'), '--pty');
+        @intcommand = (which('srun'), '--pty', '--mem-per-cpu=0');
         $defaults->{J} = "INTERACTIVE" if exists($defaults->{J});
         $defaults->{'cpu-bind'} = 'v,none';
 
