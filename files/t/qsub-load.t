@@ -3,8 +3,14 @@ use warnings;
 
 use Test::More;
 use Test::MockModule;
+use DateTime;
 
-BEGIN {unshift(@INC, '.', 't');}
+BEGIN {
+    unshift(@INC, '.', 't');
+
+    *CORE::GLOBAL::exit = sub {die("exit @_")};
+}
+
 require 'qsub.pl';
 
 ok(1, "Basic loading ok");
@@ -78,5 +84,45 @@ is_deeply(split_variables("x,y=value,z=,zz=',',xx=1"), {
     z => '',
     zz => "','",
 }, "more complex split example");
+
+=head1 convert_begin_time
+
+=cut
+
+
+my $mocktime = Test::MockModule->new('DateTime');
+my %opts;
+$mocktime->mock('now', sub {
+                DateTime->new(year => 2018, month => 11, day=>21, hour=>12, minute => 23, second => 37, %opts);
+                });
+
+my $res = {
+    'garbage' => ['garbage'], # non torque, assume slurm
+    '1600' => ['2018-11-21T16:00:00'],
+    '1200' => ['2018-11-22T12:00:00'], # next day
+    '1201' => ['2019-01-01T12:01:00', month => 12, day=>31], # next day, which triggers next month, which triggers next year
+    '211234', ['2018-11-21T12:34:00'],
+    '201234', ['2018-12-20T12:34:00'],  # next month
+    '11211234', ['2018-11-21T12:34:00'],
+    '11201234', ['2019-11-20T12:34:00'], # next year
+    '201811211234', ['2018-11-21T12:34:00'],
+    '201811211234.45' => ['2018-11-21T12:34:45'],
+    '1811211234.45' => ['2018-11-21T12:34:45'],  # no CC
+    '1811211234' => ['2018-11-21T12:34:00'],
+};
+foreach my $test (sort keys %$res) {
+    my @val = @{$res->{$test}};
+    my $value = shift(@val);
+    %opts = @val;
+    is(convert_begin_time($test), $value, "converted $test");
+}
+
+{
+    local $@;
+    eval {
+        convert_begin_time('1811201234');
+    };
+    ok($@, "exit called with date (incl year) in the past)");
+}
 
 done_testing;
