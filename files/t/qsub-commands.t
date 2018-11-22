@@ -13,6 +13,11 @@ BEGIN {
     unshift(@INC, '.', 't');
 }
 
+my $mocktime = Test::MockModule->new('DateTime');
+$mocktime->mock('now', sub {
+                DateTime->new(year => 2018, month => 11, day=>21, hour=>12, minute => 23, second => 37);
+                });
+
 require 'qsub.pl';
 
 my $sbatch = which("sbatch");
@@ -51,6 +56,7 @@ my %comms = (
     "$dba --mem-per-cpu=10M $dsa", [qw(-l pvmem=10mb), @da],
     "$dba --mem-per-cpu=20M $dsa", [qw(-l pmem=20mb), @da],
     "$dba --abc=123 --def=456 $dsa", [qw(--pass=abc=123 --pass=def=456), @da],
+    "$dba --begin=2018-11-21T16:00:00 $dsa", [qw(-a 1600), @da],
     );
 
 =head1 test all commands in %comms hash

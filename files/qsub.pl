@@ -54,6 +54,7 @@ use Switch;
 use English;
 use File::Basename;
 use Data::Dumper;
+use DateTime;
 # not in perl, but packaged in every OS
 use IPC::Run qw(run);
 use List::Util qw(first);
@@ -415,7 +416,7 @@ sub make_command
     push(@command, "--nodelist=$res_opts->{mppnodes}") if $res_opts->{mppnodes};
     push(@command, "--cpus-per-task=$res_opts->{mppdepth}") if $res_opts->{mppdepth};
 
-    push(@command, "--begin=$start_time") if $start_time;
+    push(@command, "--begin=".convert_begin_time($start_time)) if $start_time;
     push(@command, "--account=$account") if $account;
     push(@command, "-H") if $hold;
 
@@ -971,6 +972,75 @@ sub convert_mb_format
     $amount .= "M";
 
     return $amount;
+}
+
+
+sub convert_begin_time
+{
+    my $time = shift;
+
+    # assume correct slurm syntax otherwise
+
+    if ($time =~ m/^
+        ( # DD
+          ( # MM
+            ( # YY
+                (?P<CC>\d{2}+)? # CC
+              (?P<YY>\d{2})
+            )?
+            (?P<MM>\d{2})
+            )?
+          (?P<DD>\d{2})
+        )?
+        (?P<hh>\d{2})
+        (?P<mm>\d{2})
+        (?:\.(?P<SS>\d{2}))?
+        $/x) {
+        my $now = DateTime->now();
+
+        my $date = DateTime->now();
+        $date->set_hour($+{hh});
+        $date->set_minute($+{mm});
+        $date->set_second($+{SS} || 0);
+
+        my $gran = 'days';
+        if (defined($+{DD})) {
+            $gran = 'months';
+            $date->set_day($+{DD});
+        }
+        if (defined($+{MM})) {
+            $gran = 'years';
+            $date->set_month($+{MM});
+        }
+
+        if (defined($+{YY})) {
+            my $yy = $+{YY};
+            # FYI, no next century crap
+            $gran = undef;
+            my $year = $now->year();
+            if (defined($+{CC})) {
+                $year = "$+{CC}$yy"
+            } else {
+                # destroys $+
+                $year =~ s/\d{2}$/$yy/;
+            }
+            $date->set_year($year);
+        }
+
+        my $delta = $date->subtract_datetime($now);
+        if ($delta->is_negative()) {
+            if ($gran) {
+                $date->add($gran => 1);
+            } else {
+                fatal("Specified a date in past (wrong year/century): $date");
+            }
+        }
+
+        # slurm format
+        $time = $date->strftime("%Y-%m-%dT%H:%M:%S")
+    }
+
+    return $time;
 }
 
 # Run main
