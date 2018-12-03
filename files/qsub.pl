@@ -996,9 +996,9 @@ sub convert_begin_time
         (?P<mm>\d{2})
         (?:\.(?P<SS>\d{2}))?
         $/x) {
-        my $now = DateTime->now();
+        my $now = DateTime->now(time_zone => 'local');
 
-        my $date = DateTime->now();
+        my $date = DateTime->now(time_zone => 'local');
         $date->set_hour($+{hh});
         $date->set_minute($+{mm});
         $date->set_second($+{SS} || 0);
