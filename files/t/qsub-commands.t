@@ -57,7 +57,7 @@ my %comms = (
     "$dba --mem-per-cpu=20M $dsa", [qw(-l pmem=20mb), @da],
     "$dba --abc=123 --def=456 $dsa", [qw(--pass=abc=123 --pass=def=456), @da],
     "$dba --begin=2018-11-21T16:00:00 $dsa", [qw(-a 1600), @da],
-    "$dba -d /just/a/test $dsa", [qw(--chdir=/just/a/test), @da],
+    "$dba --chdir=/just/a/test $dsa", [qw(-d /just/a/test), @da],
     );
 
 =head1 test all commands in %comms hash
