@@ -347,15 +347,15 @@ sub make_command
     push(@command, "--ntasks=$node_opts->{task_cnt}") if $node_opts->{task_cnt};
     push(@command, "--nodelist=$node_opts->{hostlist}") if $node_opts->{hostlist};
 
+    push(@command, "--mincpus=$res_opts->{ncpus}") if $res_opts->{ncpus};
+    push(@command, "--ntasks-per-node=$res_opts->{mppnppn}")  if $res_opts->{mppnppn};
+
     if ($workdir) {
         push(@command, "--chdir=$workdir") if $workdir;
     } else {
         # torque defaults to start from homedir
         $defaults->{chdir} = $ENV{HOME};
     }
-
-    push(@command, "--mincpus=$res_opts->{ncpus}") if $res_opts->{ncpus};
-    push(@command, "--ntasks-per-node=$res_opts->{mppnppn}")  if $res_opts->{mppnppn};
 
     my $time;
     if ($res_opts->{walltime}) {
