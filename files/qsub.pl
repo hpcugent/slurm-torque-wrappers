@@ -197,7 +197,7 @@ sub make_command
         't=s'      => \$array,
         'v=s'      => \$variable_list,
         'V'        => \$export_env,
-        'wd=s'     => \$workdir,
+        'wd|d=s'   => \$workdir,
         'W=s'      => \@additional_attributes,
         'help|?'   => \$help,
         'man'      => \$man,
@@ -234,9 +234,6 @@ sub make_command
     my $mode = 0;
 
     $mode |= DRYRUN if $dryrun;
-
-    # torque defaults to start from homedir
-    $defaults->{chdir} = $ENV{HOME};
 
     if ($ARGV[0]) {
         $script = shift(@ARGV);
@@ -349,10 +346,15 @@ sub make_command
     push(@command, "--ntasks=$node_opts->{task_cnt}") if $node_opts->{task_cnt};
     push(@command, "--nodelist=$node_opts->{hostlist}") if $node_opts->{hostlist};
 
-    push(@command, "--chdir=$workdir") if $workdir;
-
     push(@command, "--mincpus=$res_opts->{ncpus}") if $res_opts->{ncpus};
     push(@command, "--ntasks-per-node=$res_opts->{mppnppn}")  if $res_opts->{mppnppn};
+
+    if ($workdir) {
+        push(@command, "--chdir=$workdir");
+    } else {
+        # torque defaults to start from homedir
+        $defaults->{chdir} = $ENV{HOME};
+    }
 
     my $time;
     if ($res_opts->{walltime}) {
@@ -1059,6 +1061,7 @@ B<qsub> - submit a batch job in a familiar PBS format
 qsub  [-a start_time]
       [-A account]
       [-b y|n]
+      [-d workdir]
       [-e err_path]
       [-I]
       [-l resource_list]
@@ -1098,6 +1101,10 @@ Specify the account to which the job should be charged.
 =item B<-b y|n>
 
 Whether to wrap the command line or not
+
+=item B<-d path>
+
+The working directory path to be used for the job.
 
 =item B<-e err_path>
 

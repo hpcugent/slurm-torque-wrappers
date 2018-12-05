@@ -145,4 +145,18 @@ ok(!defined($newtxt), "no text for interactive job");
 is(join(" ", @$newcommand), $txt, "expected command after parse with interactive");
 
 
+=head1 qsub -d
+
+=cut
+
+my $dir = '/just/a/test';
+@ARGV = ('-d', $dir);
+($mode, $command, $block, $script, $script_args, $defaults) = make_command($submitfilter);
+$txt = "--chdir=$dir";
+my $cmdstr = join(' ', @$command);
+ok(index($cmdstr, $txt) != -1, "$txt appears in: $cmdstr");
+# make sure --chdir is only included once in the generated command (i.e. no more --chdir=$HOME)
+my $count = ($cmdstr =~ /--chdir/g);
+is($count, 1, "exactly one --chdir found: $count");
+
 done_testing();
