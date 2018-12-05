@@ -177,7 +177,6 @@ sub make_command
         'A=s'      => \$account,
         'b=s'      => \$wrap,
         'cwd'      => sub { }, # this is the default
-        'd=s'      => \$workdir,
         'e=s'      => \$err_path,
         'h'        => \$hold,
         'I'        => \$interactive,
@@ -198,7 +197,7 @@ sub make_command
         't=s'      => \$array,
         'v=s'      => \$variable_list,
         'V'        => \$export_env,
-        'wd=s'     => \$workdir,
+        'wd|d=s'   => \$workdir,
         'W=s'      => \@additional_attributes,
         'help|?'   => \$help,
         'man'      => \$man,
@@ -351,7 +350,7 @@ sub make_command
     push(@command, "--ntasks-per-node=$res_opts->{mppnppn}")  if $res_opts->{mppnppn};
 
     if ($workdir) {
-        push(@command, "--chdir=$workdir") if $workdir;
+        push(@command, "--chdir=$workdir");
     } else {
         # torque defaults to start from homedir
         $defaults->{chdir} = $ENV{HOME};

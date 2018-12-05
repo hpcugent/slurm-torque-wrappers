@@ -57,7 +57,6 @@ my %comms = (
     "$dba --mem-per-cpu=20M $dsa", [qw(-l pmem=20mb), @da],
     "$dba --abc=123 --def=456 $dsa", [qw(--pass=abc=123 --pass=def=456), @da],
     "$dba --begin=2018-11-21T16:00:00 $dsa", [qw(-a 1600), @da],
-    "$dba --chdir=/just/a/test $dsa", [@da, qw(-d /just/a/test)],
     );
 
 =head1 test all commands in %comms hash
@@ -145,5 +144,19 @@ $txt = "$salloc -J INTERACTIVE $txt --chdir=$ENV{HOME} --cpu-bind=v,none --expor
 ok(!defined($newtxt), "no text for interactive job");
 is(join(" ", @$newcommand), $txt, "expected command after parse with interactive");
 
+
+=head1 qsub -d
+
+=cut
+
+my $dir = '/just/a/test';
+@ARGV = ('-d', $dir);
+($mode, $command, $block, $script, $script_args, $defaults) = make_command($submitfilter);
+$txt = "--chdir=$dir";
+my $cmdstr = join(' ', @$command);
+ok(index($cmdstr, $txt) != -1, "$txt appears in: $cmdstr");
+# make sure --chdir is only included once in the generated command (i.e. no more --chdir=$HOME)
+my $count = ($cmdstr =~ /--chdir/g);
+is($count, 1, "exactly one --chdir found: $count");
 
 done_testing();
