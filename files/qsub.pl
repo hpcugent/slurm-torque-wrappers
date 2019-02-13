@@ -314,7 +314,7 @@ sub make_command
                 push(@command, "-e", $err_path);
             } else {
                 # jobname will be forced
-                my $jobbasename = $job_name ? basename($job_name) : "%j";
+                my $jobbasename = $job_name ? basename($job_name) : "%x";
                 my $path = getcwd . "/$jobbasename.e%A";
                 $path .= ".%a" if $array;
                 $defaults->{e} = $path;
@@ -326,7 +326,7 @@ sub make_command
             push(@command, "-o", $out_path);
         } else {
             # jobname is forced
-            my $jobbasename = $job_name ? basename($job_name) : "%j";
+            my $jobbasename = $job_name ? basename($job_name) : "%x";
             my $path = getcwd . "/$jobbasename.o%A";
             $path .= ".%a" if $array;
             $defaults->{o} = $path;
@@ -551,7 +551,7 @@ sub parse_script
     };
 
 
-    # Look for PBS directives for -o, -e, -N
+    # Look for PBS directives for -o, -e, -N, -j
     # If they are not set, add the commandline args from defaults
     # keys are slurm option names
     my %map = (
@@ -563,16 +563,35 @@ sub parse_script
         last if $line !~ m/^\s*(#|$)/;
         # oset and eset on separate line, in case -e and -o are on same line,
         # mixed with otehr opts etc etc
-        foreach my $pbsopt (qw(e o N)) {
+        foreach my $pbsopt (qw(e j o N)) {
             my $opts = $map{$pbsopt} || [$pbsopt];
-            my $pat = '^\s*#PBS.*?\s-'.$pbsopt.'\s+\S';
+            my $pat = '^\s*#PBS.*?\s-'.$pbsopt.'\s+(\S*)\s*';
             if ($line =~ m/$pat/) {
                 foreach my $opt (@$opts) {
-                    $set{$opt} = 1
+                    $set{$opt} = $1
                 };
             }
         }
     };
+    # if -j PBS dircetive in the script,
+    # do not use default error path for slurm
+    my @check_eo = ('e', 'o');
+    if ($set{'j'}) {
+        delete $defaults->{e};
+        @check_eo = ('o');
+    }
+    
+    # check wheter the -o and -e directives are directory
+    # if yes, the set the path for slurm.
+    foreach my $dir (@check_eo) {
+        unless (grep  (/^-$dir$/, @cmd)) {
+            if (-d $set{$dir}) {
+                my $fname = $defaults->{$dir};
+                $fname =~s /\S*(\/\S*)/$1/s;
+                push(@cmd, ("-".$dir, $set{$dir} . $fname ));
+            }
+        }
+    }
 
     # slurm short options
     # add any defaults that are not set
