@@ -35,8 +35,8 @@ my @da = qw(script arg1 -l nodes=2:ppn=4);
 my $dba = "--nodes=2 --ntasks=8 --ntasks-per-node=4";
 # defaults
 my $defs = {
-    e => getcwd . '/%j.e%A',
-    o => getcwd . '/%j.o%A',
+    e => getcwd . '/%x.e%A',
+    o => getcwd . '/%x.o%A',
     J => 'script',
     export => 'NONE',
     'get-user-env' => '60L',
@@ -98,7 +98,7 @@ my $txt = "$sbatch $dba";
 is(join(" ", @$command), $txt, "expected command for submitfilter");
 
 # no match
-$txt .= " -J script --chdir=$ENV{HOME} -e ".getcwd."/%j.e%A --export=NONE --get-user-env=60L -o ".getcwd."/%j.o%A";
+$txt .= " -J script --chdir=$ENV{HOME} -e ".getcwd."/%x.e%A --export=NONE --get-user-env=60L -o ".getcwd."/%x.o%A";
 my ($newtxt, $newcommand) = parse_script('', $command, $defaults);
 is(join(" ", @$newcommand), $txt, "expected command after parse_script without eo");
 
