@@ -585,10 +585,12 @@ sub parse_script
     # if yes, the set the path for slurm.
     foreach my $dir (@check_eo) {
         unless (grep  (/^-$dir$/, @cmd)) {
-            if (-d $set{$dir}) {
-                my $fname = $defaults->{$dir};
-                $fname =~s /\S*(\/\S*)/$1/s;
-                push(@cmd, ("-".$dir, $set{$dir} . $fname ));
+            if ($set{$dir}) {
+                if (-d $set{$dir}) {
+                    my $fname = $defaults->{$dir};
+                    $fname =~s /\S*(\/\S*)/$1/s;
+                    push(@cmd, ("-".$dir, $set{$dir} . $fname ));
+                }
             }
         }
     }
