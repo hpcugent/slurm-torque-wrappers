@@ -174,17 +174,18 @@ sub pst
 my $stdin = "#\n#PBS -j oe\ncmd\n";
 $txt = " -e ";
 $cmdstr = pst($stdin);
-ok(index($cmdstr, $txt) == -1, "With -j directive, \"$txt\" argument should not be in: $cmdstr");
+is(index($cmdstr, $txt), -1, "With -j directive, \"$txt\" argument should not be in: $cmdstr");
 
 $stdin = "#\n#PBS -e .\n#PBS -o output\ncmd\n";
 $txt = "-e " . getcwd . "/./%";
 $cmdstr = pst($stdin);
-ok(index($cmdstr, $txt) != -1, "If -e directive is a directory, \"$txt\" argument should be in: $cmdstr");
+isnt(index($cmdstr, $txt), -1, "If -e directive is a directory, \"$txt\" argument should be in: $cmdstr");
 
 $stdin = "#\n#PBS -o .\n#PBS -j oe\ncmd\n";
 $txt = "-o " . getcwd . "/./%";
 my $txt2 = " -e ";
 $cmdstr = pst($stdin);
-ok(index($cmdstr, $txt) != -1 && index($cmdstr, $txt2) == -1, "If -o directive is a directory and -j directive is present, \"$txt\" argument should be and \"$txt2\" argument should not be in: $cmdstr");
+isnt(index($cmdstr, $txt), -1, "If -o directive is a directory and -j directive is present, \"$txt\" argument should be in: $cmdstr");
+is(index($cmdstr, $txt2), -1, "If -o directive is a directory and -j directive is present, \"$txt2\" argument should not be in: $cmdstr");
 
 done_testing();

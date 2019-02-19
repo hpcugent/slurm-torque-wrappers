@@ -565,7 +565,7 @@ sub parse_script
         # mixed with otehr opts etc etc
         foreach my $pbsopt (qw(e j o N)) {
             my $opts = $map{$pbsopt} || [$pbsopt];
-            my $pat = '^\s*#PBS.*?\s-'.$pbsopt.'\s+(\S*)\s*';
+            my $pat = '^\s*#PBS.*?\s-'.$pbsopt.'\s+(\S+)\s*';
             if ($line =~ m/$pat/) {
                 foreach my $opt (@$opts) {
                     $set{$opt} = $1
@@ -575,7 +575,7 @@ sub parse_script
     };
     # if -j PBS dircetive in the script,
     # do not use default error path for slurm
-    my @check_eo = ('e', 'o');
+    my @check_eo = qw(e o);
     if ($set{'j'}) {
         delete $defaults->{e};
         @check_eo = ('o');
@@ -590,7 +590,7 @@ sub parse_script
                 if (-d $set{$dir}) {
                     my $fname = $defaults->{$dir};
                     $fname =~s /\S*(\/\S*)/$1/s;
-                    push(@cmd, ("-".$dir, $set{$dir} . $fname ));
+                    push(@cmd, ("-$dir", $set{$dir} . $fname ));
                 }
             }
         }
