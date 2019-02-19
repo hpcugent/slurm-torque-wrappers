@@ -581,6 +581,7 @@ sub parse_script
         @check_eo = ('o');
     }
     
+    # Mixing -j/-o/-e arguments and directives currently might lead to undesired behavior
     # check wheter the -o and -e directives are directory
     # if yes, the set the path for slurm.
     foreach my $dir (@check_eo) {

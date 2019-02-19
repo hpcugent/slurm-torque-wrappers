@@ -144,7 +144,6 @@ $txt = "$salloc -J INTERACTIVE $txt --chdir=$ENV{HOME} --cpu-bind=v,none --expor
 ok(!defined($newtxt), "no text for interactive job");
 is(join(" ", @$newcommand), $txt, "expected command after parse with interactive");
 
-
 =head1 qsub -d
 
 =cut
@@ -158,5 +157,34 @@ ok(index($cmdstr, $txt) != -1, "$txt appears in: $cmdstr");
 # make sure --chdir is only included once in the generated command (i.e. no more --chdir=$HOME)
 my $count = ($cmdstr =~ /--chdir/g);
 is($count, 1, "exactly one --chdir found: $count");
+
+=head1 test parse_script for -j directive and if -e/-o directive is a directory
+
+=cut
+
+sub pst
+{
+    my ($stdin) = @_;
+    my ($mode, $command, $block, $script, $script_args, $defaults) = make_command();
+    my ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults);
+    my $txt = join(' ', @$newcommand);
+    return $txt;
+}
+
+my $stdin = "#\n#PBS -j oe\ncmd\n";
+$txt = " -e ";
+$cmdstr = pst($stdin);
+ok(index($cmdstr, $txt) == -1, "With -j directive, \"$txt\" argument should not be in: $cmdstr");
+
+$stdin = "#\n#PBS -e .\n#PBS -o output\ncmd\n";
+$txt = "-e " . getcwd . "/./%";
+$cmdstr = pst($stdin);
+ok(index($cmdstr, $txt) != -1, "If -e directive is a directory, \"$txt\" argument should be in: $cmdstr");
+
+$stdin = "#\n#PBS -o .\n#PBS -j oe\ncmd\n";
+$txt = "-o " . getcwd . "/./%";
+my $txt2 = " -e ";
+$cmdstr = pst($stdin);
+ok(index($cmdstr, $txt) != -1 && index($cmdstr, $txt2) == -1, "If -o directive is a directory and -j directive is present, \"$txt\" argument should be and \"$txt2\" argument should not be in: $cmdstr");
 
 done_testing();
