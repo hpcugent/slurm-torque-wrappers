@@ -573,7 +573,7 @@ sub parse_script
             }
         }
     };
-    # if -j PBS dircetive in the script,
+    # if -j PBS directive is in the script,
     # do not use default error path for slurm
     my @check_eo = qw(e o);
     if ($set{'j'}) {
