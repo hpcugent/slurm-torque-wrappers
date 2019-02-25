@@ -35,8 +35,8 @@ my @da = qw(script arg1 -l nodes=2:ppn=4);
 my $dba = "--nodes=2 --ntasks=8 --ntasks-per-node=4";
 # defaults
 my $defs = {
-    e => getcwd . '/%j.e%A',
-    o => getcwd . '/%j.o%A',
+    e => getcwd . '/%x.e%A',
+    o => getcwd . '/%x.o%A',
     J => 'script',
     export => 'NONE',
     'get-user-env' => '60L',
@@ -98,7 +98,7 @@ my $txt = "$sbatch $dba";
 is(join(" ", @$command), $txt, "expected command for submitfilter");
 
 # no match
-$txt .= " -J script --chdir=$ENV{HOME} -e ".getcwd."/%j.e%A --export=NONE --get-user-env=60L -o ".getcwd."/%j.o%A";
+$txt .= " -J script --chdir=$ENV{HOME} -e ".getcwd."/%x.e%A --export=NONE --get-user-env=60L -o ".getcwd."/%x.o%A";
 my ($newtxt, $newcommand) = parse_script('', $command, $defaults);
 is(join(" ", @$newcommand), $txt, "expected command after parse_script without eo");
 
@@ -144,7 +144,6 @@ $txt = "$salloc -J INTERACTIVE $txt --chdir=$ENV{HOME} --cpu-bind=v,none --expor
 ok(!defined($newtxt), "no text for interactive job");
 is(join(" ", @$newcommand), $txt, "expected command after parse with interactive");
 
-
 =head1 qsub -d
 
 =cut
@@ -158,5 +157,35 @@ ok(index($cmdstr, $txt) != -1, "$txt appears in: $cmdstr");
 # make sure --chdir is only included once in the generated command (i.e. no more --chdir=$HOME)
 my $count = ($cmdstr =~ /--chdir/g);
 is($count, 1, "exactly one --chdir found: $count");
+
+=head1 test parse_script for -j directive and if -e/-o directive is a directory
+
+=cut
+
+sub pst
+{
+    my ($stdin) = @_;
+    my ($mode, $command, $block, $script, $script_args, $defaults) = make_command();
+    my ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults);
+    my $txt = join(' ', @$newcommand);
+    return $txt;
+}
+
+my $stdin = "#\n#PBS -j oe\ncmd\n";
+$txt = " -e ";
+$cmdstr = pst($stdin);
+is(index($cmdstr, $txt), -1, "With -j directive, \"$txt\" argument should not be in: $cmdstr");
+
+$stdin = "#\n#PBS -e .\n#PBS -o output\ncmd\n";
+$txt = "-e " . getcwd . "/./%";
+$cmdstr = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "If -e directive is a directory, \"$txt\" argument should be in: $cmdstr");
+
+$stdin = "#\n#PBS -o .\n#PBS -j oe\ncmd\n";
+$txt = "-o " . getcwd . "/./%";
+my $txt2 = " -e ";
+$cmdstr = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "If -o directive is a directory and -j directive is present, \"$txt\" argument should be in: $cmdstr");
+is(index($cmdstr, $txt2), -1, "If -o directive is a directory and -j directive is present, \"$txt2\" argument should not be in: $cmdstr");
 
 done_testing();
