@@ -188,4 +188,15 @@ $cmdstr = pst($stdin);
 isnt(index($cmdstr, $txt), -1, "If -o directive is a directory and -j directive is present, \"$txt\" argument should be in: $cmdstr");
 is(index($cmdstr, $txt2), -1, "If -o directive is a directory and -j directive is present, \"$txt2\" argument should not be in: $cmdstr");
 
+$stdin = "";
+$txt = "-o " . getcwd . "/./%";
+@ARGV = ('-o', '.');
+$cmdstr = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "If -o argument is a directory, \"$txt\" argument should be in: $cmdstr");
+
+$txt = "-e " . getcwd . "/./%";
+@ARGV = ('-e', '.');
+$cmdstr = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "If -e argument is a directory, \"$txt\" argument should be in: $cmdstr");
+
 done_testing();

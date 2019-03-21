@@ -308,29 +308,26 @@ sub make_command
     } else {
         @command = (which(SBATCH));
 
-        if (!$join_output) {
-            if ($err_path) {
-                $err_path = getcwd . "/err_path" if $err_path !~ m{^/};
-                push(@command, "-e", $err_path);
+        my $fix_path = sub {
+            my ($eopath, $ext) = @_;
+            if ($eopath && ! -d $eopath) {
+                $eopath = getcwd . "/$eopath" if $eopath !~ m{^/};
+                push(@command, "-" . $ext, $eopath);
             } else {
                 # jobname will be forced
                 my $jobbasename = $job_name ? basename($job_name) : "%x";
-                my $path = getcwd . "/$jobbasename.e%A";
+                my $path = ($eopath || getcwd) . "/$jobbasename.$ext%A";
+                $path = getcwd . "/$path" if $path !~ m{^/};
                 $path .= ".%a" if $array;
-                $defaults->{e} = $path;
+                $defaults->{$ext} = $path;
             }
+
+        };
+        if (!$join_output) {
+            &$fix_path($err_path, "e");
         }
 
-        if ($out_path) {
-            $out_path = getcwd . "/out_path" if $out_path !~ m{^/};
-            push(@command, "-o", $out_path);
-        } else {
-            # jobname is forced
-            my $jobbasename = $job_name ? basename($job_name) : "%x";
-            my $path = getcwd . "/$jobbasename.o%A";
-            $path .= ".%a" if $array;
-            $defaults->{o} = $path;
-        }
+        &$fix_path($out_path, "o");
 
         # The job size specification may be within the batch script,
         # Reset task count if node count also specified
