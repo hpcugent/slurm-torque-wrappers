@@ -518,7 +518,7 @@ sub run_submitfilter
 
 sub parse_script
 {
-    my ($txt, $command, $defaults) = @_;
+    my ($txt, $command, $defaults, @orig_args) = @_;
 
     my @cmd = @$command;
     my $newtxt;
@@ -548,9 +548,22 @@ sub parse_script
     };
 
 
-    # Look for PBS directives for -o, -e, -N, -j
+    # Look for PBS directives for -o, -e, -N, -j if command they not given in the command line
     # If they are not set, add the commandline args from defaults
     # keys are slurm option names
+    my %orig_args = map { $_ => 1 } @orig_args;
+    my @check_pbsopt = qw(e j o N);
+    my %check_pbsopt = map { $_ => 1 } @check_pbsopt;
+    if ($orig_args{'-j'}) {
+        delete $check_pbsopt{'e'};
+    }
+    @check_pbsopt = keys %check_pbsopt;
+    foreach my $argument (@check_pbsopt) {
+        if($orig_args{"-$argument"}) {
+            delete $check_pbsopt{$argument};
+        }
+    }
+    @check_pbsopt = keys %check_pbsopt;
     my %map = (
         N => ['J'],
         V => ['export', 'get-user-env'],
@@ -560,7 +573,7 @@ sub parse_script
         last if $line !~ m/^\s*(#|$)/;
         # oset and eset on separate line, in case -e and -o are on same line,
         # mixed with otehr opts etc etc
-        foreach my $pbsopt (qw(e j o N)) {
+        foreach my $pbsopt (@check_pbsopt) {
             my $opts = $map{$pbsopt} || [$pbsopt];
             my $pat = '^\s*#PBS.*?\s-'.$pbsopt.'\s+(\S+)\s*';
             if ($line =~ m/$pat/) {
@@ -570,11 +583,18 @@ sub parse_script
             }
         }
     };
+
     # if -j PBS directive is in the script,
     # do not use default error path for slurm
     my @check_eo = qw(e o);
-    if ($set{'j'}) {
+    if ($set{'j'} || $orig_args{'-j'}) {
         delete $defaults->{e};
+        # delete command line defined error file, if -j directive defined
+        for (my $element=0; $element < scalar(@cmd); $element++) {
+            if ($cmd[$element] eq '-e') {
+                splice @cmd, $element, 2;
+            }
+        }
         @check_eo = ('o');
     }
     
@@ -582,7 +602,7 @@ sub parse_script
     # check wheter the -o and -e directives are directory
     # if yes, the set the path for slurm.
     foreach my $dir (@check_eo) {
-        unless (grep  (/^-$dir$/, @cmd)) {
+        unless (grep (/^-$dir$/, @cmd)) {
             if ($set{$dir}) {
                 if (-d $set{$dir}) {
                     my $fname = $defaults->{$dir};
@@ -657,7 +677,7 @@ sub main
 
     # stdin is not relevant for interactive jobs
     # but should also add the defaults
-    ($stdin, $command) = parse_script($stdin, $command, $defaults);
+    ($stdin, $command) = parse_script($stdin, $command, $defaults, @orig_args);
 
     # Execute the command and capture its stdout, stderr, and exit status.
     # Note that if interactive mode was requested,
