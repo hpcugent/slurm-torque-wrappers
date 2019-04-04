@@ -548,7 +548,7 @@ sub parse_script
     };
 
 
-    # Look for PBS directives for -o, -e, -N, -j if they not given in the command line
+    # Look for PBS directives o, -e, -N, -j if they not given in the command line
     # If they are not set, add the commandline args from defaults
     # keys are slurm option names
     my %orig_argsh = map { s/^-//; $_ => 1 } grep {m/^-.$/} @$orig_args;  # only map the one-letter options, and remove the leading -
