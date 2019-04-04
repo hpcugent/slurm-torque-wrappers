@@ -166,7 +166,7 @@ sub pst
 {
     my ($stdin, @static_ARGV) = @_;
     my ($mode, $command, $block, $script, $script_args, $defaults) = make_command();
-    my ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults, @static_ARGV);
+    my ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults, \@static_ARGV);
     my $txt = join(' ', @$newcommand);
     return $txt;
 }
