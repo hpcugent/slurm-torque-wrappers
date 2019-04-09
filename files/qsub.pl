@@ -308,29 +308,26 @@ sub make_command
     } else {
         @command = (which(SBATCH));
 
-        if (!$join_output) {
-            if ($err_path) {
-                $err_path = getcwd . "/err_path" if $err_path !~ m{^/};
-                push(@command, "-e", $err_path);
+        my $fix_path = sub {
+            my ($eopath, $ext) = @_;
+            if ($eopath && ! -d $eopath) {
+                $eopath = getcwd . "/$eopath" if $eopath !~ m{^/};
+                push(@command, "-" . $ext, $eopath);
             } else {
                 # jobname will be forced
                 my $jobbasename = $job_name ? basename($job_name) : "%x";
-                my $path = getcwd . "/$jobbasename.e%A";
+                my $path = ($eopath || getcwd) . "/$jobbasename.$ext%A";
+                $path = getcwd . "/$path" if $path !~ m{^/};
                 $path .= ".%a" if $array;
-                $defaults->{e} = $path;
+                $defaults->{$ext} = $path;
             }
+
+        };
+        if (!$join_output) {
+            &$fix_path($err_path, "e");
         }
 
-        if ($out_path) {
-            $out_path = getcwd . "/out_path" if $out_path !~ m{^/};
-            push(@command, "-o", $out_path);
-        } else {
-            # jobname is forced
-            my $jobbasename = $job_name ? basename($job_name) : "%x";
-            my $path = getcwd . "/$jobbasename.o%A";
-            $path .= ".%a" if $array;
-            $defaults->{o} = $path;
-        }
+        &$fix_path($out_path, "o");
 
         # The job size specification may be within the batch script,
         # Reset task count if node count also specified
@@ -521,7 +518,7 @@ sub run_submitfilter
 
 sub parse_script
 {
-    my ($txt, $command, $defaults) = @_;
+    my ($txt, $command, $defaults, $orig_args) = @_;
 
     my @cmd = @$command;
     my $newtxt;
@@ -551,9 +548,13 @@ sub parse_script
     };
 
 
-    # Look for PBS directives for -o, -e, -N, -j
+    # Look for PBS directives o, -e, -N, -j if they not given in the command line
     # If they are not set, add the commandline args from defaults
     # keys are slurm option names
+    my %orig_argsh = map { s/^-//; $_ => 1 } grep {m/^-.$/} @$orig_args;  # only map the one-letter options, and remove the leading -
+    my @check_pbsopt = qw(j o N);
+    push (@check_pbsopt, 'e') if !$orig_argsh{'j'};
+    @check_pbsopt =  grep {!$orig_argsh{$_}} @check_pbsopt;
     my %map = (
         N => ['J'],
         V => ['export', 'get-user-env'],
@@ -563,7 +564,7 @@ sub parse_script
         last if $line !~ m/^\s*(#|$)/;
         # oset and eset on separate line, in case -e and -o are on same line,
         # mixed with otehr opts etc etc
-        foreach my $pbsopt (qw(e j o N)) {
+        foreach my $pbsopt (@check_pbsopt) {
             my $opts = $map{$pbsopt} || [$pbsopt];
             my $pat = '^\s*#PBS.*?\s-'.$pbsopt.'\s+(\S+)\s*';
             if ($line =~ m/$pat/) {
@@ -573,11 +574,18 @@ sub parse_script
             }
         }
     };
+
     # if -j PBS directive is in the script,
     # do not use default error path for slurm
     my @check_eo = qw(e o);
     if ($set{'j'}) {
         delete $defaults->{e};
+        # delete command line defined error file, if -j directive defined
+        for (my $element=0; $element < scalar(@cmd); $element++) {
+            if ($cmd[$element] eq '-e') {
+                splice @cmd, $element, 2;
+            }
+        }
         @check_eo = ('o');
     }
     
@@ -585,7 +593,7 @@ sub parse_script
     # check wheter the -o and -e directives are directory
     # if yes, the set the path for slurm.
     foreach my $dir (@check_eo) {
-        unless (grep  (/^-$dir$/, @cmd)) {
+        unless (grep (/^-$dir$/, @cmd)) {
             if ($set{$dir}) {
                 if (-d $set{$dir}) {
                     my $fname = $defaults->{$dir};
@@ -660,7 +668,7 @@ sub main
 
     # stdin is not relevant for interactive jobs
     # but should also add the defaults
-    ($stdin, $command) = parse_script($stdin, $command, $defaults);
+    ($stdin, $command) = parse_script($stdin, $command, $defaults, \@orig_args);
 
     # Execute the command and capture its stdout, stderr, and exit status.
     # Note that if interactive mode was requested,

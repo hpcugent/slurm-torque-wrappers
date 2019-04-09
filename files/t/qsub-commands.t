@@ -164,9 +164,9 @@ is($count, 1, "exactly one --chdir found: $count");
 
 sub pst
 {
-    my ($stdin) = @_;
+    my ($stdin, @static_ARGV) = @_;
     my ($mode, $command, $block, $script, $script_args, $defaults) = make_command();
-    my ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults);
+    my ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults, \@static_ARGV);
     my $txt = join(' ', @$newcommand);
     return $txt;
 }
@@ -187,5 +187,97 @@ my $txt2 = " -e ";
 $cmdstr = pst($stdin);
 isnt(index($cmdstr, $txt), -1, "If -o directive is a directory and -j directive is present, \"$txt\" argument should be in: $cmdstr");
 is(index($cmdstr, $txt2), -1, "If -o directive is a directory and -j directive is present, \"$txt2\" argument should not be in: $cmdstr");
+
+$stdin = "";
+$txt = "-o " . getcwd . "/./%";
+@ARGV = ('-o', '.');
+$cmdstr = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "If -o argument is a directory, \"$txt\" argument should be in: $cmdstr");
+
+$txt = "-e " . getcwd . "/./%";
+@ARGV = ('-e', '.');
+$cmdstr = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "If -e argument is a directory, \"$txt\" argument should be in: $cmdstr");
+
+sub generate
+{
+    my @array;
+    my ($format, $comm_dir) = @_;
+    mkdir "dir_${comm_dir}_dir";
+    for my $e (" ", "-e dir_${comm_dir}_dir ", "-e $comm_dir ") {
+        for my $o (" ", "-o dir_${comm_dir}_dir ", "-o $comm_dir ") {
+            for my $j (" ", "-j oe ") {
+                for my $N (" ",  "-N ${comm_dir}_name ") {
+                    push(@array, sprintf($format, $e, $o, $j, $N));
+                };
+            };
+        };
+    };
+    return @array
+}
+
+sub check_eo_test {
+    my ($commandline, $stdin, $cmdstr, $getcwd, $oore) = @_;
+    my $outorerr = "Output";
+    if ($oore eq "e") {
+        $outorerr = "Error";
+    }
+    my $name_check = sub {
+        my $comm_or_std = $commandline;
+        my $comm_or_std_txt = "commandline";
+        if ($_[0] eq "stdin") {
+            $comm_or_std = $stdin;
+            $comm_or_std_txt = "directive";
+        }
+        if (index($comm_or_std, "-$oore dir_${comm_or_std_txt}_dir") != -1) {
+            isnt(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/"), -1, "$outorerr should be in dir_${comm_or_std_txt}_dir directory\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+            if (index($commandline, "-N") != -1 ) {
+                isnt(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/commandline_name"), -1, "Name of the file should be taken form command line\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+                is(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/directive_name"), -1, "Name of the file should be taken form command line, not from directive\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+            } else {
+                if (index($stdin, "-N") != -1 ) {
+                isnt(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/%x"), -1, "Name of the file should be handled by Slurm\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+                }
+            }
+        }
+    };
+    if (index($commandline, "-$oore") != -1) {
+        is(index($cmdstr, "-$oore $getcwd/directive"), -1, "If -$oore in commandline defined, then -$oore directive should be ignored\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+        if (index($commandline, "-$oore commandline") != -1) {
+            isnt(index($cmdstr, "-$oore $getcwd/commandline"), -1, "$outorerr name should be commandline\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+        }
+        &$name_check("commandline");
+    } else {
+        if (index($stdin, "-$oore directive") != -1) {
+            is(index($cmdstr, "-$oore $getcwd/directive"), -1, "$outorerr name handled by slurm plugin\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+        }
+        &$name_check("stdin");
+    }
+}
+
+my @commandlines = generate("%s %s %s %s", "commandline");
+my @stdins = generate("#!/bin/bash\n#PBS %s\n#PBS %s\n#PBS %s\n#PBS %s\ncmd\n", "directive");
+my $getcwd = getcwd;
+for my $commandline (@commandlines) {
+    my @static_ARGV = split ' ', $commandline;
+    for $stdin (@stdins) {
+        @ARGV = @static_ARGV;
+        $cmdstr = pst($stdin, @static_ARGV);
+        check_eo_test($commandline, $stdin, $cmdstr, $getcwd, "o");
+        if (index($commandline, "-j oe") != -1 || index($stdin, "-j oe") != -1) {
+            is(index($cmdstr, "-e "), -1, "If -j command line option or directive is defined, -e should not be defined\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+        } else {
+            check_eo_test($commandline, $stdin, $cmdstr, $getcwd, "e");
+        }
+        if (index($commandline, "-N") != -1 ) {
+            isnt(index($cmdstr, "-J commandline_name"), -1, "Name should be taken form command line\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+            is(index($cmdstr, "-J directive_name"), -1, "Name should be taken form command line, not from directives\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+        } else {
+            if (index($stdin, "-N") != -1 ) {
+            is(index($cmdstr, "-J directive_name"), -1, "Name is handled by Slurm\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+            }
+        }
+    };
+};
 
 done_testing();
