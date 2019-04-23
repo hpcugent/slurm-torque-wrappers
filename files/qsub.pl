@@ -159,7 +159,6 @@ sub make_command
         @pe_ev_opts,
         $priority,
         $requeue,
-        $destination,
         $dryrun,
         $variable_list,
         @additional_attributes,
@@ -190,7 +189,8 @@ sub make_command
         'p=i'      => \$priority,
         'pe=s{2}'  => \@pe_ev_opts,
         'P=s'      => \$wckey,
-        'q=s'      => \$destination,
+        'q=s'      => sub { fatal("In SLURM no queues defined. " .
+                                "Please do not use \"-q <QUEUE>\" option.\n") },
         'r=s'      => \$requeue,
         'S=s'      => sub { warn "option -S is ignored, " .
                                 "specify shell via #!<shell> in the job script\n" },
@@ -289,6 +289,9 @@ sub make_command
     my @intcommand;
 
     if ($interactive || $fake) {
+        if ($script) {
+            fatal("Intreactive jobs are not allowed to run a jobscript (in this case: \"$script\")");
+        }
         $mode |= INTERACTIVE;
         @command = (which(SALLOC));
         @intcommand = (which('srun'), '--pty', '--mem-per-cpu=0');
@@ -427,7 +430,6 @@ sub make_command
     }
     push(@command, "--mail-user=$mail_user_list") if $mail_user_list;
     push(@command, "--nice=$priority") if $priority;
-    push(@command, "-p", $destination) if $destination;
     push(@command, "--wckey=$wckey") if $wckey;
 
     if ($requeue) {
@@ -526,6 +528,12 @@ sub parse_script
     my @lines;
     @lines = split("\n", $txt) if defined $txt;
 
+    # Do not let users use #PBS -q directive
+    foreach my $line (@lines) {
+        if ($line =~ m/\s*#PBS.*?\s-q/) {
+            fatal("In SLURM no queues defined. Please do not use \"#PBS -q <QUEUE>\" directive in the jobscript");
+        }
+    };
     # insert shebang
     if (defined($txt) && (!@lines || $lines[0] !~ m/^#!/)) {
         # no shebang, insert SHELL
