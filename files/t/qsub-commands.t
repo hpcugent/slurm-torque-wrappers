@@ -164,39 +164,39 @@ is($count, 1, "exactly one --chdir found: $count");
 
 sub pst
 {
-    my ($stdin, @static_ARGV) = @_;
-    my ($mode, $command, $block, $script, $script_args, $defaults) = make_command();
-    my ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults, \@static_ARGV);
+    my ($stdin, $static_ARGV) = @_;
+    my ($mode, $command, $block, $script, $script_args, $defaults, $destination) = make_command();
+    my ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults, $static_ARGV, $destination);
     my $txt = join(' ', @$newcommand);
-    return $txt;
+    return $txt, $newtxt;
 }
 
 my $stdin = "#\n#PBS -j oe\ncmd\n";
 $txt = " -e ";
-$cmdstr = pst($stdin);
+($cmdstr, $newtxt) = pst($stdin);
 is(index($cmdstr, $txt), -1, "With -j directive, \"$txt\" argument should not be in: $cmdstr");
 
 $stdin = "#\n#PBS -e .\n#PBS -o output\ncmd\n";
 $txt = "-e " . getcwd . "/./%";
-$cmdstr = pst($stdin);
+($cmdstr, $newtxt) = pst($stdin);
 isnt(index($cmdstr, $txt), -1, "If -e directive is a directory, \"$txt\" argument should be in: $cmdstr");
 
 $stdin = "#\n#PBS -o .\n#PBS -j oe\ncmd\n";
 $txt = "-o " . getcwd . "/./%";
 my $txt2 = " -e ";
-$cmdstr = pst($stdin);
+($cmdstr, $newtxt) = pst($stdin);
 isnt(index($cmdstr, $txt), -1, "If -o directive is a directory and -j directive is present, \"$txt\" argument should be in: $cmdstr");
 is(index($cmdstr, $txt2), -1, "If -o directive is a directory and -j directive is present, \"$txt2\" argument should not be in: $cmdstr");
 
 $stdin = "";
 $txt = "-o " . getcwd . "/./%";
 @ARGV = ('-o', '.');
-$cmdstr = pst($stdin);
+($cmdstr, $newtxt) = pst($stdin);
 isnt(index($cmdstr, $txt), -1, "If -o argument is a directory, \"$txt\" argument should be in: $cmdstr");
 
 $txt = "-e " . getcwd . "/./%";
 @ARGV = ('-e', '.');
-$cmdstr = pst($stdin);
+($cmdstr, $newtxt) = pst($stdin);
 isnt(index($cmdstr, $txt), -1, "If -e argument is a directory, \"$txt\" argument should be in: $cmdstr");
 
 sub generate
@@ -259,10 +259,10 @@ my @commandlines = generate("%s %s %s %s", "commandline");
 my @stdins = generate("#!/bin/bash\n#PBS %s\n#PBS %s\n#PBS %s\n#PBS %s\ncmd\n", "directive");
 my $getcwd = getcwd;
 for my $commandline (@commandlines) {
-    my @static_ARGV = split ' ', $commandline;
     for $stdin (@stdins) {
+        my @static_ARGV = split ' ', $commandline;
         @ARGV = @static_ARGV;
-        $cmdstr = pst($stdin, @static_ARGV);
+        ($cmdstr, $newtxt) = pst($stdin, \@static_ARGV);
         check_eo_test($commandline, $stdin, $cmdstr, $getcwd, "o");
         if (index($commandline, "-j oe") != -1 || index($stdin, "-j oe") != -1) {
             is(index($cmdstr, "-e "), -1, "If -j command line option or directive is defined, -e should not be defined\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
@@ -280,4 +280,27 @@ for my $commandline (@commandlines) {
     };
 };
 
+$stdin = "";
+$txt = "--x11";
+@ARGV = ('-X');
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "If -X option used, \"$txt\" option should be in: $cmdstr");
+
+$stdin = "#!/usr/bin/bash\n#PBS -X\necho\n";
+$txt = "--x11";
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "If -X directive used, \"$txt\" option should be in: $cmdstr");
+
+$stdin = "";
+$txt = "#PBS -l walltime=72:00:00";
+@ARGV = ('-q', 'long');
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($newtxt, $txt), -1, "If -q long option used, \"$txt\" directive should be in: $newtxt");
+
+$stdin = "#!/usr/bin/bash\n#PBS -q long\necho\n";
+$txt = "#PBS -l walltime=72:00:00";
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($newtxt, $txt), -1, "If -q long directive used, \"$txt\" directive should be in: $newtxt");
+
 done_testing();
+
