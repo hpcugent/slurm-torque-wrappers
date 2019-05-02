@@ -549,11 +549,7 @@ sub parse_script
             $line =~ s/\$\{?PBS_JOBID\}?/%A/g;
         }
 
-        if ($line =~ m/^\s*#PBS.*?\s-q/) {
-            warn "Please do not use #PBS -q <QUEUE> directive in the job script.\n" .
-                "Right now it sets only the default walltime based on the queue.\n" .
-                "So please request explicitly the desired walltime.";
-        } else {
+        if ($line !~ m/^\s*#PBS.*?\s-q/) {
             push(@newtxt, $line);
         }
     };
@@ -588,23 +584,23 @@ sub parse_script
     };
 
     # handle queues
-    if ($orig_argsh{'q'}) {
-        warn "Please do not use -q <QUEUE> option for qsub.\n" .
+    if ($orig_argsh{'q'} || $set{'q'}) {
+        warn "Please do not set a queue (\'-q\' otion or \'#PBS -q\' directive).\n" .
             "Right now it sets only the default walltime based on the queue,\n" .
-            "So please request explicitly the desired walltime.";
+            "So please request explicitly the desired walltime.\n";
 
     }
     my $userqueue = $destination || $set{'q'};
     if ($userqueue) {
-        my $modwalltime;
-        switch ($userqueue) {
-            case "short"   { $modwalltime = '1:00:00'; }
-            case "bshort"  { $modwalltime = '1:00:00'; }
-            case "long"    { $modwalltime = '72:00:00'; }
-            case "debug"   { $modwalltime = '15:00'; }
-            else           { fatal("You have used a non-existing queue name!\n"); }
-        }
-        splice(@newtxt, 1, 0, "#PBS -l walltime=$modwalltime");
+        my %modwalltime = (
+            'short'  => '1:00:00',
+            'bshort' => '1:00:00', 
+            'long'   => '72:00:00',
+            'debug'  => '15:00',
+        );
+        if ($modwalltime{$userqueue}) {
+            splice(@newtxt, 1, 0, "## walltime from deprecated queue $userqueue", "#PBS -l walltime=$modwalltime{$userqueue}");
+            } else { fatal("You have used a non-existing queue name!\n"); }
     }
 
     # add x11 forward
