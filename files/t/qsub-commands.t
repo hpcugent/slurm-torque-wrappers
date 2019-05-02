@@ -303,4 +303,3 @@ $txt = "#PBS -l walltime=72:00:00";
 isnt(index($newtxt, $txt), -1, "If -q long directive used, \"$txt\" directive should be in: $newtxt");
 
 done_testing();
-
