@@ -159,12 +159,14 @@ sub make_command
         @pe_ev_opts,
         $priority,
         $requeue,
+        $destination,
         $dryrun,
         $variable_list,
         @additional_attributes,
         $wckey,
         $workdir,
         $wrap,
+        $x11forward,
         $help,
         $resp,
         $man,
@@ -189,8 +191,7 @@ sub make_command
         'p=i'      => \$priority,
         'pe=s{2}'  => \@pe_ev_opts,
         'P=s'      => \$wckey,
-        'q=s'      => sub { fatal("In SLURM no queues defined. " .
-                                "Please do not use \"-q <QUEUE>\" option.\n") },
+        'q=s'      => \$destination,
         'r=s'      => \$requeue,
         'S=s'      => sub { warn "option -S is ignored, " .
                                 "specify shell via #!<shell> in the job script\n" },
@@ -199,6 +200,7 @@ sub make_command
         'V'        => \$export_env,
         'wd|d=s'   => \$workdir,
         'W=s'      => \@additional_attributes,
+        'X'        => \$x11forward,
         'help|?'   => \$help,
         'man'      => \$man,
         'sbatchline|dryrun' => \$dryrun,
@@ -290,7 +292,7 @@ sub make_command
 
     if ($interactive || $fake) {
         if ($script) {
-            fatal("Intreactive jobs are not allowed to run a jobscript (in this case: \"$script\")");
+            fatal("Interactive jobs are not allowed to run a jobscript (in this case: \"$script\")");
         }
         $mode |= INTERACTIVE;
         @command = (which(SALLOC));
@@ -348,6 +350,7 @@ sub make_command
 
     push(@command, "--mincpus=$res_opts->{ncpus}") if $res_opts->{ncpus};
     push(@command, "--ntasks-per-node=$res_opts->{mppnppn}")  if $res_opts->{mppnppn};
+    push(@command, '--x11') if $x11forward;
 
     if ($workdir) {
         push(@command, "--chdir=$workdir");
@@ -465,7 +468,7 @@ sub make_command
         }
     }
 
-    return $mode, \@command, $block, $script, \@script_args, $defaults;
+    return $mode, \@command, $block, $script, \@script_args, $defaults, $destination;
 }
 
 
@@ -520,24 +523,18 @@ sub run_submitfilter
 
 sub parse_script
 {
-    my ($txt, $command, $defaults, $orig_args) = @_;
+    my ($txt, $command, $defaults, $orig_args, $destination) = @_;
 
     my @cmd = @$command;
-    my $newtxt;
+    my @newtxt;
 
     my @lines;
     @lines = split("\n", $txt) if defined $txt;
 
-    # Do not let users use #PBS -q directive
-    foreach my $line (@lines) {
-        if ($line =~ m/\s*#PBS.*?\s-q/) {
-            fatal("In SLURM no queues defined. Please do not use \"#PBS -q <QUEUE>\" directive in the jobscript");
-        }
-    };
     # insert shebang
     if (defined($txt) && (!@lines || $lines[0] !~ m/^#!/)) {
         # no shebang, insert SHELL
-        $newtxt .= "#!".($ENV{SHELL} || DEFAULT_SHELL)."\n";
+        push(@newtxt, "#!".($ENV{SHELL} || DEFAULT_SHELL));
     }
 
     # replace PBS_JOBID in -o / -e
@@ -552,15 +549,18 @@ sub parse_script
             $line =~ s/\$\{?PBS_JOBID\}?/%A/g;
         }
 
-        $newtxt .= "$line\n";
+        if ($line !~ m/^\s*#PBS.*?\s-q/) {
+            push(@newtxt, $line);
+        }
     };
 
 
     # Look for PBS directives o, -e, -N, -j if they not given in the command line
     # If they are not set, add the commandline args from defaults
     # keys are slurm option names
+    # Check for -X and -q as well.
     my %orig_argsh = map { s/^-//; $_ => 1 } grep {m/^-.$/} @$orig_args;  # only map the one-letter options, and remove the leading -
-    my @check_pbsopt = qw(j o N);
+    my @check_pbsopt = qw(j o N X q);
     push (@check_pbsopt, 'e') if !$orig_argsh{'j'};
     @check_pbsopt =  grep {!$orig_argsh{$_}} @check_pbsopt;
     my %map = (
@@ -574,7 +574,7 @@ sub parse_script
         # mixed with otehr opts etc etc
         foreach my $pbsopt (@check_pbsopt) {
             my $opts = $map{$pbsopt} || [$pbsopt];
-            my $pat = '^\s*#PBS.*?\s-'.$pbsopt.'\s+(\S+)\s*';
+            my $pat = $pbsopt eq 'X' ? '^\s*#PBS.*?\s-('.$pbsopt.')' : '^\s*#PBS.*?\s-'.$pbsopt.'\s+(\S+)\s*';
             if ($line =~ m/$pat/) {
                 foreach my $opt (@$opts) {
                     $set{$opt} = $1
@@ -582,6 +582,31 @@ sub parse_script
             }
         }
     };
+
+    # handle queues
+    if ($orig_argsh{'q'} || $set{'q'}) {
+        warn "Please do not set a queue (\'-q\' option or \'#PBS -q\' directive).\n" .
+            "Right now it sets only the default walltime based on the queue,\n" .
+            "So please request explicitly the desired walltime.\n";
+
+    }
+    my $userqueue = $destination || $set{'q'};
+    if ($userqueue) {
+        my %modwalltime = (
+            'short'  => '1:00:00',
+            'bshort' => '1:00:00', 
+            'long'   => '72:00:00',
+            'debug'  => '15:00',
+        );
+        if ($modwalltime{$userqueue}) {
+            splice(@newtxt, 1, 0, "## walltime from deprecated queue $userqueue", "#PBS -l walltime=$modwalltime{$userqueue}");
+        } else {
+            fatal("You have used a non-existing queue name!\n");
+        }
+    }
+
+    # add x11 forward
+    push(@cmd, '--x11') if $set{'X'};
 
     # if -j PBS directive is in the script,
     # do not use default error path for slurm
@@ -635,7 +660,7 @@ sub parse_script
         };
     };
 
-    return ($newtxt, \@cmd);
+    return (@newtxt ? join("\n", @newtxt, "") : undef, \@cmd);
 }
 
 sub main
@@ -645,7 +670,7 @@ sub main
 
     my $sf = find_submitfilter;
 
-    my ($mode, $command, $block, $script, $script_args, $defaults) = make_command($sf);
+    my ($mode, $command, $block, $script, $script_args, $defaults, $destination) = make_command($sf);
 
     my $stdin;
     if (!($mode & INTERACTIVE)) {
@@ -676,7 +701,7 @@ sub main
 
     # stdin is not relevant for interactive jobs
     # but should also add the defaults
-    ($stdin, $command) = parse_script($stdin, $command, $defaults, \@orig_args);
+    ($stdin, $command) = parse_script($stdin, $command, $defaults, \@orig_args, $destination);
 
     # Execute the command and capture its stdout, stderr, and exit status.
     # Note that if interactive mode was requested,
@@ -1109,12 +1134,12 @@ qsub  [-a start_time]
       [-p priority]
       [-pe shm task_cnt]
       [-P wckey]
-      [-q destination]
       [-r y|n]
       [-v variable_list]
       [-V]
       [-wd workdir]
       [-W additional_attributes]
+      [-X]
       [-h]
       [--debug|-D]
       [--pass]
@@ -1212,6 +1237,10 @@ options unless the -v option is used.
 =item B<-wd workdir>
 
 Specify the workdir of a job.  The default is the current work dir.
+
+=item B<-X>
+
+Enables X11 forwarding.
 
 =item B<-?> | B<--help>
 
