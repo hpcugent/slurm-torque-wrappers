@@ -585,7 +585,7 @@ sub parse_script
 
     # handle queues
     if ($orig_argsh{'q'} || $set{'q'}) {
-        warn "Please do not set a queue (\'-q\' otion or \'#PBS -q\' directive).\n" .
+        warn "Please do not set a queue (\'-q\' option or \'#PBS -q\' directive).\n" .
             "Right now it sets only the default walltime based on the queue,\n" .
             "So please request explicitly the desired walltime.\n";
 
@@ -600,7 +600,9 @@ sub parse_script
         );
         if ($modwalltime{$userqueue}) {
             splice(@newtxt, 1, 0, "## walltime from deprecated queue $userqueue", "#PBS -l walltime=$modwalltime{$userqueue}");
-            } else { fatal("You have used a non-existing queue name!\n"); }
+        } else {
+            fatal("You have used a non-existing queue name!\n");
+        }
     }
 
     # add x11 forward
