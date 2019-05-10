@@ -586,23 +586,26 @@ sub parse_script
     # handle queues and special queues (as a partition)
     my $userqueue = $destination || $set{'q'};
     if ($userqueue) {
-        if ($userqueue =~ "_special") {
-            push(@cmd, '--partition', $userqueue);
-            } else {
+        if ($userqueue eq "special" ) {
+            push(@cmd, '--partition', "$ENV{'VSC_INSTITUTE_CLUSTER'}_$userqueue") if $ENV{'VSC_INSTITUTE_CLUSTER'};
+        } else {
             warn "Please do not set a queue (\'-q\' option or \'#PBS -q\' directive).\n" .
                 "Right now it sets only the default walltime based on the queue,\n" .
                 "So please request explicitly the desired walltime.\n";
-            my %modwalltime = (
-                'short'  => '1:00:00',
-                'bshort' => '1:00:00',
-                'long'   => '72:00:00',
-                'debug'  => '15:00',
-            );
-            if ($modwalltime{$userqueue}) {
-                splice(@newtxt, 1, 0, "## walltime from deprecated queue $userqueue", "#PBS -l walltime=$modwalltime{$userqueue}");
-            } else {
-                fatal("You have used a non-existing queue name!\n");
+        }
+        my %modwalltime = (
+            'short'   => '1:00:00',
+            'bshort'  => '1:00:00',
+            'long'    => '72:00:00',
+            'debug'   => '15:00',
+            'special' => '48:00:00',
+        );
+        if ($modwalltime{$userqueue}) {
+            if (!$orig_argsh{'I'}) {
+                splice(@newtxt, 1, 0, "## walltime from deprecated or special queue $userqueue", "#PBS -l walltime=$modwalltime{$userqueue}");
             }
+        } else {
+            fatal("You have used a non-existing queue name!\n");
         }
     }
     # add x11 forward

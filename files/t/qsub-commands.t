@@ -302,15 +302,16 @@ $txt = "#PBS -l walltime=72:00:00";
 ($cmdstr, $newtxt) = pst($stdin);
 isnt(index($newtxt, $txt), -1, "If -q long directive used, \"$txt\" directive should be in: $newtxt");
 
+local $ENV{VSC_INSTITUTE_CLUSTER} = "kluster";
 $stdin = "";
-$txt = "--partition _special";
-@ARGV = ('-q', '_special');
+$txt = "--partition $ENV{VSC_INSTITUTE_CLUSTER}_special";
+@ARGV = ('-q', 'special');
 ($cmdstr, $newtxt) = pst($stdin);
-isnt(index($cmdstr, $txt), -1, "If -q  *_special option used, \"$txt\" option should be in: $cmdstr");
+isnt(index($cmdstr, $txt), -1, "If -q  $ENV{VSC_INSTITUTE_CLUSTER}_special option used, \"$txt\" option should be in: $cmdstr");
 
-$stdin = "#!/usr/bin/bash\n#PBS -q _special \necho\n";
-$txt = "--partition _special";
+$stdin = "#!/usr/bin/bash\n#PBS -q special \necho\n";
+$txt = "--partition $ENV{VSC_INSTITUTE_CLUSTER}_special";
 ($cmdstr, $newtxt) = pst($stdin);
-isnt(index($cmdstr, $txt), -1, "If -q *_special directive used, \"$txt\" option should be in: $cmdstr");
+isnt(index($cmdstr, $txt), -1, "If -q $ENV{VSC_INSTITUTE_CLUSTER}_special directive used, \"$txt\" option should be in: $cmdstr");
 
 done_testing();
