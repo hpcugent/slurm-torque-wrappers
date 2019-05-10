@@ -302,4 +302,15 @@ $txt = "#PBS -l walltime=72:00:00";
 ($cmdstr, $newtxt) = pst($stdin);
 isnt(index($newtxt, $txt), -1, "If -q long directive used, \"$txt\" directive should be in: $newtxt");
 
+$stdin = "";
+$txt = "--partition _special";
+@ARGV = ('-q', '_special');
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "If -q  *_special option used, \"$txt\" option should be in: $cmdstr");
+
+$stdin = "#!/usr/bin/bash\n#PBS -q _special \necho\n";
+$txt = "--partition _special";
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "If -q *_special directive used, \"$txt\" option should be in: $cmdstr");
+
 done_testing();
