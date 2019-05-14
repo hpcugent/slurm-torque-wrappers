@@ -302,16 +302,16 @@ $txt = "#PBS -l walltime=72:00:00";
 ($cmdstr, $newtxt) = pst($stdin);
 isnt(index($newtxt, $txt), -1, "If -q long directive used, \"$txt\" directive should be in: $newtxt");
 
-local $ENV{VSC_INSTITUTE_CLUSTER} = "kluster";
+local $ENV{SLURM_CLUSTERS} = "kluster";
 $stdin = "";
-$txt = "--partition $ENV{VSC_INSTITUTE_CLUSTER}_special";
+$txt = "--partition $ENV{SLURM_CLUSTERS}_special";
 @ARGV = ('-q', 'special');
 ($cmdstr, $newtxt) = pst($stdin);
-isnt(index($cmdstr, $txt), -1, "If -q  $ENV{VSC_INSTITUTE_CLUSTER}_special option used, \"$txt\" option should be in: $cmdstr");
+isnt(index($cmdstr, $txt), -1, "If -q  $ENV{SLURM_CLUSTERS}_special option used, \"$txt\" option should be in: $cmdstr");
 
 $stdin = "#!/usr/bin/bash\n#PBS -q special \necho\n";
-$txt = "--partition $ENV{VSC_INSTITUTE_CLUSTER}_special";
+$txt = "--partition $ENV{SLURM_CLUSTERS}_special";
 ($cmdstr, $newtxt) = pst($stdin);
-isnt(index($cmdstr, $txt), -1, "If -q $ENV{VSC_INSTITUTE_CLUSTER}_special directive used, \"$txt\" option should be in: $cmdstr");
+isnt(index($cmdstr, $txt), -1, "If -q $ENV{SLURM_CLUSTERS}_special directive used, \"$txt\" option should be in: $cmdstr");
 
 done_testing();

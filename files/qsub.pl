@@ -587,7 +587,13 @@ sub parse_script
     my $userqueue = $destination || $set{'q'};
     if ($userqueue) {
         if ($userqueue eq "special" ) {
-            push(@cmd, '--partition', "$ENV{'VSC_INSTITUTE_CLUSTER'}_$userqueue") if $ENV{'VSC_INSTITUTE_CLUSTER'};
+            if (defined $ENV{SLURM_CLUSTERS} && $ENV{SLURM_CLUSTERS} !~ m/[;:,\/]/)  {
+                push(@cmd, '--partition', "$ENV{SLURM_CLUSTERS}_$userqueue");
+            } else {
+                fatal("You have problem with your environment!\n" .
+                    "Your environmental variable SLURM_CLUSTERS is\n" .
+                    "either empty or contains multiple clusters.\n");
+            }
         } else {
             warn "Please do not set a queue (\'-q\' option or \'#PBS -q\' directive).\n" .
                 "Right now it sets only the default walltime based on the queue,\n" .
