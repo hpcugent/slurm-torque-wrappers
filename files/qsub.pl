@@ -583,23 +583,33 @@ sub parse_script
         }
     };
 
-    # handle queues
-    if ($orig_argsh{'q'} || $set{'q'}) {
-        warn "Please do not set a queue (\'-q\' option or \'#PBS -q\' directive).\n" .
-            "Right now it sets only the default walltime based on the queue,\n" .
-            "So please request explicitly the desired walltime.\n";
-
-    }
+    # handle queues and special queues (as a partition)
     my $userqueue = $destination || $set{'q'};
     if ($userqueue) {
+        if ($userqueue eq "special" ) {
+            if (defined $ENV{SLURM_CLUSTERS} && $ENV{SLURM_CLUSTERS} !~ m/[;:,\/]/)  {
+                push(@cmd, '--partition', "$ENV{SLURM_CLUSTERS}_$userqueue");
+            } else {
+                fatal("We do not support your environment.\n" .
+                    "Your environmental variable SLURM_CLUSTERS is\n" .
+                    "either empty or contains multiple clusters.\n");
+            }
+        } else {
+            warn "Please do not set a queue (\'-q\' option or \'#PBS -q\' directive).\n" .
+                "Right now it sets only the default walltime based on the queue,\n" .
+                "So please request explicitly the desired walltime.\n";
+        }
         my %modwalltime = (
-            'short'  => '1:00:00',
-            'bshort' => '1:00:00', 
-            'long'   => '72:00:00',
-            'debug'  => '15:00',
+            'short'   => '1:00:00',
+            'bshort'  => '1:00:00',
+            'long'    => '72:00:00',
+            'debug'   => '15:00',
+            'special' => '48:00:00',
         );
         if ($modwalltime{$userqueue}) {
-            splice(@newtxt, 1, 0, "## walltime from deprecated queue $userqueue", "#PBS -l walltime=$modwalltime{$userqueue}");
+            if (!$orig_argsh{'I'}) {
+                splice(@newtxt, 1, 0, "## walltime from deprecated or special queue $userqueue", "#PBS -l walltime=$modwalltime{$userqueue}");
+            }
         } else {
             fatal("You have used a non-existing queue name!\n");
         }
