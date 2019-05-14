@@ -614,6 +614,7 @@ sub parse_script
             fatal("You have used a non-existing queue name!\n");
         }
     }
+
     # add x11 forward
     push(@cmd, '--x11') if $set{'X'};
 
