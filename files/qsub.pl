@@ -590,7 +590,7 @@ sub parse_script
             if (defined $ENV{SLURM_CLUSTERS} && $ENV{SLURM_CLUSTERS} !~ m/[;:,\/]/)  {
                 push(@cmd, '--partition', "$ENV{SLURM_CLUSTERS}_$userqueue");
             } else {
-                fatal("You have problem with your environment!\n" .
+                fatal("We do not support your environment.\n" .
                     "Your environmental variable SLURM_CLUSTERS is\n" .
                     "either empty or contains multiple clusters.\n");
             }
