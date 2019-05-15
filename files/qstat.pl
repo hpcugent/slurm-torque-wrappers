@@ -131,8 +131,10 @@ sub main
             if ($full) { # Full
                 print_part_full($part) if $part->{name} !~ m/_special$/;
             } else { # Brief
-                print_part_brief($part, $line) if $part->{name} !~ m/_special$/;
-                $line++;
+                if ($part->{name} !~ m/_special$/) {
+                    print_part_brief($part, $line) if $part->{name} !~ m/_special$/;
+                    $line++;
+                }
             }
             $rc = 0;
         }
@@ -157,8 +159,10 @@ sub main
             }
             $total_running += $part->{running_jobs};
             $total_queued += $part->{queued_jobs};
-            print_part_limits($part, $line) if $part->{name} !~ m/_special$/;
-            $line++;
+            if ($part->{name} !~ m/_special$/ || ($part->{running_jobs} != 0 || $part->{queued_jobs} != 0)) {
+                print_part_limits($part, $line);
+                $line++;
+            }
         }
         printf("                                               ----- -----\n");
         printf("                                               %5d %5d\n",
@@ -654,7 +658,7 @@ sub print_part_limits
 
     printf("%-16.16s   --      --    ", $part->{name});
     if($part->{max_time} != INFINITE) {
-        print(hhmmss($part->{max_time}*60));
+        printf("%8.8s", hhmmss($part->{max_time}*60)));
     } else {
         printf("   --    ");
     }
@@ -662,7 +666,7 @@ sub print_part_limits
     if($part->{max_nodes} != INFINITE) {
         printf("%4u  ", $part->{max_nodes});
     } else {
-        printf("  --  ");
+        printf("  --   ");
     }
 
     printf("%3u %3u --  %1.1s %1.1s \n", $part->{running_jobs},
