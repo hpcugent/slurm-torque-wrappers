@@ -658,7 +658,7 @@ sub print_part_limits
 
     printf("%-16.16s   --      --    ", $part->{name});
     if($part->{max_time} != INFINITE) {
-        printf("%8.8s", hhmmss($part->{max_time}*60)));
+        printf("%8.8s", hhmmss($part->{max_time}*60));
     } else {
         printf("   --    ");
     }
