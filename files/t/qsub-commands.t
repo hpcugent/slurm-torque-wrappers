@@ -314,4 +314,13 @@ $txt = "--partition $ENV{SLURM_CLUSTERS}_special";
 ($cmdstr, $newtxt) = pst($stdin);
 isnt(index($cmdstr, $txt), -1, "If -q $ENV{SLURM_CLUSTERS}_special directive used, \"$txt\" option should be in: $cmdstr");
 
+$stdin = "";
+$txt = "salloc";
+$txt2 = "--partition $ENV{SLURM_CLUSTERS}_special";
+my $txt3 = "srun";
+@ARGV = ('-q', 'special', '-I');
+($cmdstr, $newtxt) = pst($stdin);
+ok(index($cmdstr, $txt) < index($cmdstr, $txt2), "$txt should be before $txt2 in \"$cmdstr\"");
+ok(index($cmdstr, $txt2) < index($cmdstr, $txt3), "$txt2 should be before $txt3 in \"$cmdstr\"");
+
 done_testing();
