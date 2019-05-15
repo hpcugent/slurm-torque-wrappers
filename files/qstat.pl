@@ -132,7 +132,7 @@ sub main
                 print_part_full($part) if $part->{name} !~ m/_special$/;
             } else { # Brief
                 if ($part->{name} !~ m/_special$/) {
-                    print_part_brief($part, $line) if $part->{name} !~ m/_special$/;
+                    print_part_brief($part, $line);
                     $line++;
                 }
             }
