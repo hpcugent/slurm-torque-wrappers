@@ -129,9 +129,9 @@ sub main
             }
 
             if ($full) { # Full
-                print_part_full($part);
+                print_part_full($part) if $part->{name} !~ m/_special$/;
             } else { # Brief
-                print_part_brief($part, $line);
+                print_part_brief($part, $line) if $part->{name} !~ m/_special$/;
                 $line++;
             }
             $rc = 0;
@@ -157,7 +157,7 @@ sub main
             }
             $total_running += $part->{running_jobs};
             $total_queued += $part->{queued_jobs};
-            print_part_limits($part, $line);
+            print_part_limits($part, $line) if $part->{name} !~ m/_special$/;
             $line++;
         }
         printf("                                               ----- -----\n");
