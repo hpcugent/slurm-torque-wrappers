@@ -588,7 +588,7 @@ sub parse_script
     if ($userqueue) {
         if ($userqueue eq "special" ) {
             if (defined $ENV{SLURM_CLUSTERS} && $ENV{SLURM_CLUSTERS} !~ m/[;:,\/]/)  {
-                push(@cmd, '--partition', "$ENV{SLURM_CLUSTERS}_$userqueue");
+                splice(@cmd, 1, 0, '--partition', "$ENV{SLURM_CLUSTERS}_$userqueue");
             } else {
                 fatal("We do not support your environment.\n" .
                     "Your environmental variable SLURM_CLUSTERS is\n" .
