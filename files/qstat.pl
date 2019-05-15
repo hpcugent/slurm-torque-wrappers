@@ -163,6 +163,7 @@ sub main
         printf("                                               ----- -----\n");
         printf("                                               %5d %5d\n",
                $total_running, $total_queued);
+        printf("\nPlease be aware that \"qstat -q\" only gives information about your own jobs.\n\n");
     } else {
         my @jobIds = @ARGV;
         my @userIds = split(/,/, $userList) if $userList;
