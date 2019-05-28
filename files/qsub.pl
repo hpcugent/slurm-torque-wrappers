@@ -540,7 +540,19 @@ sub parse_script
     # replace PBS_JOBID in -o / -e
     #   torque sets stdout/err in cwd -> so force abspath like done above
     # All script changes here
+    my $change_line = sub {
+        my ($line, $env_var, $prefix) = @_;
+        if ($line =~ m/^\s*#PBS.*?\$\{?$prefix($env_var)\}?/ && $ENV{$1}) {
+            $line =~ s/\$\{?$prefix($env_var)\}?/$ENV{$1}/g;
+        }
+        return ($line);
+    };
+
     foreach my $line (@lines) {
+        $line = &$change_line($line, 'VSC[A-Z_]*', '');
+        $line = &$change_line($line, 'HOME', '');
+        $line = &$change_line($line, 'HOME', 'PBS_O_');
+        $line = &$change_line($line, 'MAIL', 'PBS_O_');
         if ($line =~ m/^\s*(#PBS.*?\s-[oe])(?:\s*(\S+)(.*))?$/) {
             if ($2 !~ m{^/}) {
                 $line = "$1 ".getcwd."/$2$3";
@@ -562,7 +574,7 @@ sub parse_script
     my %orig_argsh = map { s/^-//; $_ => 1 } grep {m/^-.$/} @$orig_args;  # only map the one-letter options, and remove the leading -
     my @check_pbsopt = qw(j o N X q);
     push (@check_pbsopt, 'e') if !$orig_argsh{'j'};
-    @check_pbsopt =  grep {!$orig_argsh{$_}} @check_pbsopt;
+    @check_pbsopt = grep {!$orig_argsh{$_}} @check_pbsopt;
     my %map = (
         N => ['J'],
         V => ['export', 'get-user-env'],
@@ -737,6 +749,7 @@ sub main
         my $command_txt = join(" ", @$command);
         if ($mode & DRYRUN) {
             print "$command_txt\n";
+            print ("stdin is:\n--START-OF-STDIN--\n$stdin\n--END-OF-STDIN--\n");
             exit 0;
         } else {
             debug("Generated", ($block ? 'blocking' : undef), "command '$command_txt'");
@@ -745,6 +758,7 @@ sub main
         my $stdout;
 
         local $@;
+        debug("stdin is:\n--START-OF-STDIN--\n$stdin\n--END-OF-STDIN--\n");
         eval {
             # Execute the command and capture the combined stdout and stderr.
             # TODO: why is this required?

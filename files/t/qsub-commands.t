@@ -323,4 +323,15 @@ my $txt3 = "srun";
 ok(index($cmdstr, $txt) < index($cmdstr, $txt2), "$txt should be before $txt2 in \"$cmdstr\"");
 ok(index($cmdstr, $txt2) < index($cmdstr, $txt3), "$txt2 should be before $txt3 in \"$cmdstr\"");
 
+local $ENV{VSC_HOME} = '/home/path';
+$txt = '/home/path/test.foo';
+$stdin = "#!/usr/bin/bash\n#PBS -o \${VSC_HOME}/test.foo \necho\n";
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($newtxt, $txt), -1, "If #PBS -o \${VSC_HOME}/test.foo used in the submit script, it have to be translated to \"$txt\" in: $newtxt");
+
+local $ENV{MAIL} = 'e@mail.com';
+$stdin = "#!/usr/bin/bash\n#PBS -M \$PBS_O_MAIL \necho\n";
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($newtxt, $ENV{MAIL}), -1, "If #PBS -M \$PBS_O_MAIL used in the submit script, it have to be translated to \"$ENV{MAIL}\" in: $newtxt");
+
 done_testing();
