@@ -548,25 +548,24 @@ sub parse_script
         return ($line);
     };
 
-    my @replace_script_vars = (
-        [qw(PBS_O_HOME HOME)],
-        [qw(PBS_O_HOST HOST)],
-        [qw(PBS_O_LOGNAME LOGNAME)],
-        [qw(PBS_O_MAIL MAIL)],
-        [qw(PBS_O_PATH PATH)],
-        [qw(PBS_O_SHELL SHELL)],
-        [qw(PBS_O_WORKDIR PWD)],
+    my %replace_script_vars = (
+        PBS_O_HOME => 'HOME',
+        PBS_O_HOST => 'HOST',
+        PBS_O_LOGNAME => 'LOGNAME',
+        PBS_O_MAIL => 'MAIL',
+        PBS_O_PATH => 'PATH',
+        PBS_O_SHELL => 'SHELL',
+        PBS_O_WORKDIR => 'PWD',
     );
     #Add all local varibales to @replace_script_vars
-    foreach my $existing_env_vars (keys %ENV) {
-        push @replace_script_vars, [$existing_env_vars, $existing_env_vars];
+    foreach my $existing_env_vars (sort keys %ENV) {
+        $replace_script_vars{$existing_env_vars} = $existing_env_vars;
     };
 
     # Replace env_vars in the submit script (only in #PBS lines)
     foreach my $line (@lines) {
-        foreach my $replace_script_var (@replace_script_vars) {
-            my ($var, $value) = @$replace_script_var;
-            $line = &$replace_env_var($line, $var, $value);
+        foreach my $replace_script_var (sort keys %replace_script_vars) {
+            $line = &$replace_env_var($line, $replace_script_var, $replace_script_vars{$replace_script_var});
         };
         # replace PBS_JOBID in -o / -e
         #   torque sets stdout/err in cwd -> so force abspath like done above
