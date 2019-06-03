@@ -908,7 +908,25 @@ sub parse_all_resource_list
     my (@resource_list) = @_;
 
     my ($res_opts, $node_opts);
+
+    my %multiplier = (
+        half => 0.5,
+        all  => 1,
+        );
+
     foreach my $rl (@resource_list) {
+        if ($ENV{VSC_INSTITUTE_CLUSTER}) {
+            my $tnp = qx(python -c "from vsc.jobs.pbs.clusterdata import CLUSTERDATA; print CLUSTERDATA['$ENV{VSC_INSTITUTE_CLUSTER}']['NP']" 2>&1);
+            if ($? == 0) {
+                while ($rl =~ m/ppn=(all|half)/) {
+                    my $np = $tnp * $multiplier{$1};
+                    $rl =~ s/(ppn=)$1/$1$np/;
+                };
+            } else {
+                fatal("Cannot determine number of processors for cluster \"$ENV{VSC_INSTITUTE_CLUSTER}\"");
+            };
+        };
+
         my ($opts, $matches) = parse_resource_list($rl);
         # Loop over all values, how to determine that a value is not reset with default option?
         if ($res_opts && %$res_opts) {
