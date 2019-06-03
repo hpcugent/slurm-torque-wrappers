@@ -537,22 +537,39 @@ sub parse_script
         push(@newtxt, "#!".($ENV{SHELL} || DEFAULT_SHELL));
     }
 
-    # replace PBS_JOBID in -o / -e
-    #   torque sets stdout/err in cwd -> so force abspath like done above
-    # All script changes here
-    my $change_line = sub {
-        my ($line, $env_var, $prefix) = @_;
-        if ($line =~ m/^\s*#PBS.*?\$\{?$prefix($env_var)\}?/ && $ENV{$1}) {
-            $line =~ s/\$\{?$prefix($env_var)\}?/$ENV{$1}/g;
+    # replace_script_var changes environmental variables in the lines of submitted script starts with #PBS
+    # for example (see @replace_script_vars array)
+    # "#PBS -m $PBS_O_MAIL" to "#PBS -m e@mail.to", if $MAIL has the value "e@mail.to" at submit time.
+    my $replace_env_var = sub {
+        my ($line, $script_var, $env_var) = @_;
+        if ($line =~ m/^\s*#PBS.*?\$\{?$script_var\}?/ && $ENV{$env_var}) {
+            $line =~ s/\$\{?$script_var\}?/$ENV{$env_var}/g;
         }
         return ($line);
     };
 
+    my @replace_script_vars = (
+        [qw(PBS_O_HOME HOME)],
+        [qw(PBS_O_HOST HOST)],
+        [qw(PBS_O_LOGNAME LOGNAME)],
+        [qw(PBS_O_MAIL MAIL)],
+        [qw(PBS_O_PATH PATH)],
+        [qw(PBS_O_SHELL SHELL)],
+        [qw(PBS_O_WORKDIR PWD)],
+    );
+    #Add all local varibales to @replace_script_vars
+    foreach my $existing_env_vars (keys %ENV) {
+        push @replace_script_vars, [$existing_env_vars, $existing_env_vars];
+    };
+
+    # Replace env_vars in the submit script (only in #PBS lines)
     foreach my $line (@lines) {
-        $line = &$change_line($line, 'VSC[A-Z_]*', '');
-        $line = &$change_line($line, 'HOME', '');
-        $line = &$change_line($line, 'HOME', 'PBS_O_');
-        $line = &$change_line($line, 'MAIL', 'PBS_O_');
+        foreach my $replace_script_var (@replace_script_vars) {
+            my ($var, $value) = @$replace_script_var;
+            $line = &$replace_env_var($line, $var, $value);
+        };
+        # replace PBS_JOBID in -o / -e
+        #   torque sets stdout/err in cwd -> so force abspath like done above
         if ($line =~ m/^\s*(#PBS.*?\s-[oe])(?:\s*(\S+)(.*))?$/) {
             if ($2 !~ m{^/}) {
                 $line = "$1 ".getcwd."/$2$3";
@@ -565,7 +582,6 @@ sub parse_script
             push(@newtxt, $line);
         }
     };
-
 
     # Look for PBS directives o, -e, -N, -j if they not given in the command line
     # If they are not set, add the commandline args from defaults

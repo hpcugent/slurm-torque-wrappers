@@ -327,11 +327,18 @@ local $ENV{VSC_HOME} = '/home/path';
 $txt = '/home/path/test.foo';
 $stdin = "#!/usr/bin/bash\n#PBS -o \${VSC_HOME}/test.foo \necho\n";
 ($cmdstr, $newtxt) = pst($stdin);
-isnt(index($newtxt, $txt), -1, "If #PBS -o \${VSC_HOME}/test.foo used in the submit script, it have to be translated to \"$txt\" in: $newtxt");
+isnt(index($newtxt, $txt), -1, "If #PBS -o \${VSC_HOME}/test.foo used in the submit script, it has to be translated to \"$txt\" in: $newtxt");
 
 local $ENV{MAIL} = 'e@mail.com';
 $stdin = "#!/usr/bin/bash\n#PBS -M \$PBS_O_MAIL \necho\n";
 ($cmdstr, $newtxt) = pst($stdin);
-isnt(index($newtxt, $ENV{MAIL}), -1, "If #PBS -M \$PBS_O_MAIL used in the submit script, it have to be translated to \"$ENV{MAIL}\" in: $newtxt");
+isnt(index($newtxt, $ENV{MAIL}), -1, "If #PBS -M \$PBS_O_MAIL used in the submit script, it has to be translated to \"$ENV{MAIL}\" in: $newtxt");
+
+local $ENV{VSC_DATA} = '/data/path';
+local $ENV{VSC_INSTITUTE_CLUSTER} = 'pokemon';
+$txt = '/data/path/pokemon/test.foo';
+$stdin = "#!/usr/bin/bash\n#PBS -o \$VSC_DATA/\$VSC_INSTITUTE_CLUSTER/test.foo \necho\n";
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($newtxt, $txt), -1, "If #PBS -o \$VSC_DATA/\$VSC_INSTITUTE_CLUSTER/test.foo used in the submit script, it has to be translated to \"$txt\" in: $newtxt");
 
 done_testing();
