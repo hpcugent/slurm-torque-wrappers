@@ -539,10 +539,38 @@ sub parse_script
         push(@newtxt, "#!".($ENV{SHELL} || DEFAULT_SHELL));
     }
 
-    # replace PBS_JOBID in -o / -e
-    #   torque sets stdout/err in cwd -> so force abspath like done above
-    # All script changes here
+    # replace_script_var changes environmental variables in the lines of submitted script starts with #PBS
+    # for example (see @replace_script_vars array)
+    # "#PBS -m $PBS_O_MAIL" to "#PBS -m e@mail.to", if $MAIL has the value "e@mail.to" at submit time.
+    my $replace_env_var = sub {
+        my ($line, $script_var, $env_var) = @_;
+        if ($line =~ m/^\s*#PBS.*?\$\{?$script_var\}?/ && $ENV{$env_var}) {
+            $line =~ s/\$\{?$script_var\}?/$ENV{$env_var}/g;
+        }
+        return ($line);
+    };
+
+    my %replace_script_vars = (
+        PBS_O_HOME => 'HOME',
+        PBS_O_HOST => 'HOST',
+        PBS_O_LOGNAME => 'LOGNAME',
+        PBS_O_MAIL => 'MAIL',
+        PBS_O_PATH => 'PATH',
+        PBS_O_SHELL => 'SHELL',
+        PBS_O_WORKDIR => 'PWD',
+    );
+    #Add all local varibales to @replace_script_vars
+    foreach my $existing_env_vars (sort keys %ENV) {
+        $replace_script_vars{$existing_env_vars} = $existing_env_vars;
+    };
+
+    # Replace env_vars in the submit script (only in #PBS lines)
     foreach my $line (@lines) {
+        foreach my $replace_script_var (sort keys %replace_script_vars) {
+            $line = &$replace_env_var($line, $replace_script_var, $replace_script_vars{$replace_script_var});
+        };
+        # replace PBS_JOBID in -o / -e
+        #   torque sets stdout/err in cwd -> so force abspath like done above
         if ($line =~ m/^\s*(#PBS.*?\s-[oe])(?:\s*(\S+)(.*))?$/) {
             if ($2 !~ m{^/}) {
                 $line = "$1 ".getcwd."/$2$3";
@@ -556,7 +584,6 @@ sub parse_script
         }
     };
 
-
     # Look for PBS directives o, -e, -N, -j if they not given in the command line
     # If they are not set, add the commandline args from defaults
     # keys are slurm option names
@@ -564,7 +591,7 @@ sub parse_script
     my %orig_argsh = map { s/^-//; $_ => 1 } grep {m/^-.$/} @$orig_args;  # only map the one-letter options, and remove the leading -
     my @check_pbsopt = qw(j o N X q t);
     push (@check_pbsopt, 'e') if !$orig_argsh{'j'};
-    @check_pbsopt =  grep {!$orig_argsh{$_}} @check_pbsopt;
+    @check_pbsopt = grep {!$orig_argsh{$_}} @check_pbsopt;
     my %map = (
         N => ['J'],
         V => ['export', 'get-user-env'],
@@ -755,6 +782,7 @@ sub main
         my $command_txt = join(" ", @$command);
         if ($mode & DRYRUN) {
             print "$command_txt\n";
+            print ("stdin is:\n--START-OF-STDIN--\n$stdin\n--END-OF-STDIN--\n");
             exit 0;
         } else {
             debug("Generated", ($block ? 'blocking' : undef), "command '$command_txt'");
@@ -763,6 +791,7 @@ sub main
         my $stdout;
 
         local $@;
+        debug("stdin is:\n--START-OF-STDIN--\n$stdin\n--END-OF-STDIN--\n");
         eval {
             # Execute the command and capture the combined stdout and stderr.
             # TODO: why is this required?
@@ -926,7 +955,27 @@ sub parse_all_resource_list
     my (@resource_list) = @_;
 
     my ($res_opts, $node_opts);
+
+    my %multiplier = (
+        half => 0.5,
+        all  => 1,
+        );
+
+    my $have_numproc = 0;
+    my $tnumproc = 0;
+    if ($ENV{VSC_INSTITUTE_CLUSTER}) {
+        $tnumproc = qx(python -c "from vsc.jobs.pbs.clusterdata import CLUSTERDATA; print CLUSTERDATA['$ENV{VSC_INSTITUTE_CLUSTER}']['NP']" 2>&1);
+        $have_numproc = 1 if !$?;
+    }
+
     foreach my $rl (@resource_list) {
+        if ($have_numproc) {
+            while ($rl =~ m/ppn=(all|half)/) {
+                my $np = int($tnumproc * $multiplier{$1});
+                $rl =~ s/(ppn=)$1/$1$np/;
+            };
+        };
+
         my ($opts, $matches) = parse_resource_list($rl);
         # Loop over all values, how to determine that a value is not reset with default option?
         if ($res_opts && %$res_opts) {
@@ -995,6 +1044,9 @@ sub parse_node_opts
     }
 
     $opt{hostlist} = Slurm::Hostlist::ranged_string($hl);
+    if ($opt{hostlist} =~ m{ppn=(all|half)}) {
+        fatal("Cannot determine number of processors for ppn={all,half}");
+    }
 
     my $hl_cnt = Slurm::Hostlist::count($hl);
     $opt{node_cnt} = $hl_cnt if $hl_cnt > $opt{node_cnt};
