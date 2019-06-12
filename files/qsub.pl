@@ -953,7 +953,7 @@ sub parse_all_resource_list
     foreach my $rl (@resource_list) {
         if ($have_numproc) {
             while ($rl =~ m/ppn=(all|half)/) {
-                my $np = int($tnumproc) * int($multiplier{$1});
+                my $np = int($tnumproc * $multiplier{$1});
                 $rl =~ s/(ppn=)$1/$1$np/;
             };
         };
