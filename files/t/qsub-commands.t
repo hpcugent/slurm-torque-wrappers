@@ -341,4 +341,31 @@ $stdin = "#!/usr/bin/bash\n#PBS -o \$VSC_DATA/\$VSC_INSTITUTE_CLUSTER/test.foo \
 ($cmdstr, $newtxt) = pst($stdin);
 isnt(index($newtxt, $txt), -1, "If #PBS -o \$VSC_DATA/\$VSC_INSTITUTE_CLUSTER/test.foo used in the submit script, it has to be translated to \"$txt\" in: $newtxt");
 
+$stdin = "#!/usr/bin/bash\n#PBS -t 1\necho\n";
+$txt = "-%a";
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "Array extension \"$txt\" should be in \"$cmdstr\"");
+
+$stdin = "#!/usr/bin/bash\necho\n";
+my @staticARGV = ('-t', '1');
+@ARGV = @staticARGV;
+$txt = "-%a";
+($cmdstr, $newtxt) = pst($stdin, \@staticARGV);
+isnt(index($cmdstr, $txt), -1, "Array extension \"$txt\" should be in \"$cmdstr\"");
+
+$stdin = "#!/usr/bin/bash\n#PBS -t 1\n#PBS -o OutputFile\necho\n";
+@ARGV = ('-e', 'ErrorFile');
+$txt = "-%a";
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "Array extension \"$txt\" should be in \"$cmdstr\"");
+isnt(index($newtxt, $txt), -1, "Array extension \"$txt\" should be in \"$newtxt\"");
+
+$stdin = "#!/usr/bin/bash\n#PBS -o OutputFile\necho\n";
+@staticARGV = ('-t', '1', '-e', 'ErrorFile');
+@ARGV = @staticARGV;
+$txt = "-%a";
+($cmdstr, $newtxt) = pst($stdin, \@staticARGV);
+isnt(index($cmdstr, $txt), -1, "Array extension \"$txt\" should be in \"$cmdstr\"");
+isnt(index($newtxt, $txt), -1, "Array extension \"$txt\" should be in \"$newtxt\"");
+
 done_testing();

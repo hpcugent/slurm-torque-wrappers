@@ -294,6 +294,9 @@ sub make_command
         if ($script) {
             fatal("Interactive jobs are not allowed to run a jobscript (in this case: \"$script\")");
         }
+        if ($array) {
+            fatal("Interactive job can not be job array");
+        }
         $mode |= INTERACTIVE;
         @command = (which(SALLOC));
         @intcommand = (which('srun'), '--pty', '--mem-per-cpu=0');
@@ -323,7 +326,6 @@ sub make_command
                 my $jobbasename = $job_name ? basename($job_name) : "%x";
                 my $path = ($eopath || getcwd) . "/$jobbasename.$ext%A";
                 $path = getcwd . "/$path" if $path !~ m{^/};
-                $path .= ".%a" if $array;
                 $defaults->{$ext} = $path;
             }
 
@@ -587,7 +589,7 @@ sub parse_script
     # keys are slurm option names
     # Check for -X and -q as well.
     my %orig_argsh = map { s/^-//; $_ => 1 } grep {m/^-.$/} @$orig_args;  # only map the one-letter options, and remove the leading -
-    my @check_pbsopt = qw(j o N X q);
+    my @check_pbsopt = qw(j o N X q t);
     push (@check_pbsopt, 'e') if !$orig_argsh{'j'};
     @check_pbsopt = grep {!$orig_argsh{$_}} @check_pbsopt;
     my %map = (
@@ -659,16 +661,15 @@ sub parse_script
         @check_eo = ('o');
     }
     
-    # Mixing -j/-o/-e arguments and directives currently might lead to undesired behavior
     # check wheter the -o and -e directives are directory
-    # if yes, the set the path for slurm.
+    # if yes, then set the path for slurm.
     foreach my $dir (@check_eo) {
         unless (grep (/^-$dir$/, @cmd)) {
             if ($set{$dir}) {
                 if (-d $set{$dir}) {
                     my $fname = $defaults->{$dir};
                     $fname =~s /\S*(\/\S*)/$1/s;
-                    push(@cmd, ("-$dir", $set{$dir} . $fname ));
+                    push(@cmd, ("-$dir", $set{$dir}.$fname));
                 }
             }
         }
@@ -696,6 +697,23 @@ sub parse_script
             }
         };
     };
+
+    # add array extensions if it is an array job
+    if ($orig_argsh{t} || $set{t}) {
+        my $arrayext = '-%a';
+        for my $element (0 .. $#cmd) {
+            foreach my $dir (qw(e o)) {
+                if ($cmd[$element] eq "-$dir" && $cmd[$element+1] !~ m{%a}) {
+                    $cmd[$element+1] .= $arrayext;
+                }
+            }
+        }
+        for my $element (0 .. $#newtxt) {
+            if ($newtxt[$element] =~ m/^\s*(#PBS.*?\s-[oe])(?:\s*(\S+)(.*))?$/ && $newtxt[$element] !~ m{%a}) {
+                $newtxt[$element] = "$1$2$arrayext$3";
+            }
+        }
+    }
 
     return (@newtxt ? join("\n", @newtxt, "") : undef, \@cmd);
 }
