@@ -937,7 +937,27 @@ sub parse_all_resource_list
     my (@resource_list) = @_;
 
     my ($res_opts, $node_opts);
+
+    my %multiplier = (
+        half => 0.5,
+        all  => 1,
+        );
+
+    my $have_numproc = 0;
+    my $tnumproc = 0;
+    if ($ENV{VSC_INSTITUTE_CLUSTER}) {
+        $tnumproc = qx(python -c "from vsc.jobs.pbs.clusterdata import CLUSTERDATA; print CLUSTERDATA['$ENV{VSC_INSTITUTE_CLUSTER}']['NP']" 2>&1);
+        $have_numproc = 1 if !$?;
+    }
+
     foreach my $rl (@resource_list) {
+        if ($have_numproc) {
+            while ($rl =~ m/ppn=(all|half)/) {
+                my $np = int($tnumproc * $multiplier{$1});
+                $rl =~ s/(ppn=)$1/$1$np/;
+            };
+        };
+
         my ($opts, $matches) = parse_resource_list($rl);
         # Loop over all values, how to determine that a value is not reset with default option?
         if ($res_opts && %$res_opts) {
@@ -1006,6 +1026,9 @@ sub parse_node_opts
     }
 
     $opt{hostlist} = Slurm::Hostlist::ranged_string($hl);
+    if ($opt{hostlist} =~ m{ppn=(all|half)}) {
+        fatal("Cannot determine number of processors for ppn={all,half}");
+    }
 
     my $hl_cnt = Slurm::Hostlist::count($hl);
     $opt{node_cnt} = $hl_cnt if $hl_cnt > $opt{node_cnt};
