@@ -117,6 +117,10 @@ sub main
         pod2usage(2);
     }
 
+    if (scalar @jobIds == 1 && $jobIds[0] eq 'all') {
+        exec("scancel -u $ENV{USER}");
+    }
+
     my $rc = 0;
     foreach my $jobid (@jobIds) {
         if ($jobid =~ m/\[\d+\]$/) {
