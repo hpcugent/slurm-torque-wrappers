@@ -674,7 +674,7 @@ sub parse_script
     # add array extensions if it is an array job
     if ($orig_argsh{t} || $set{t}) {
         my $arrayext = '-%a';
-        for (my $element=0; $element < scalar(@cmd); $element++) {
+        for my $element (0 .. $#cmd) {
             foreach my $dir (qw(e o)) {
                 if ($cmd[$element] eq "-$dir" && $cmd[$element+1] !~ m{%a}) {
                     $cmd[$element+1] .= $arrayext;
