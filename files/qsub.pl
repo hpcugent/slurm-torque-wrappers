@@ -708,7 +708,7 @@ sub parse_script
                 }
             }
         }
-        for (my $element=0; $element < scalar(@newtxt); $element++) {
+        for my $element (0 .. $#newtxt) {
             if ($newtxt[$element] =~ m/^\s*(#PBS.*?\s-[oe])(?:\s*(\S+)(.*))?$/ && $newtxt[$element] !~ m{%a}) {
                 $newtxt[$element] = "$1$2$arrayext$3";
             }
