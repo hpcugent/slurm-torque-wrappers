@@ -136,7 +136,7 @@ Main:
 	    my $features  = $node->{'features'};
 	    my $rAMem     = $node->{'real_memory'};
 	    my $rAProc    = ($node->{'cpus'} -
-		    ($node->{'alloc_cpus'} + $node->{'err_cpus'}));
+		    ($node->{'alloc_cpus'} + $node->{'err_cpus'} || 0));
 	    my $state     = lc(Slurm->node_state_string($node->{'node_state'}));
             my $reason    = $node->{'reason'};
 	    my $gres      = $node->{'gres'};
