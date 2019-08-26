@@ -170,7 +170,10 @@ sub make_command
         $help,
         $resp,
         $man,
-        @pass
+        @pass,
+        $gpu,
+        $cpus_per_gpu,
+        $mem_per_gpu,
         );
 
     GetOptions(
@@ -206,6 +209,12 @@ sub make_command
         'sbatchline|dryrun' => \$dryrun,
         'debug|D'      => \$debug,
         'pass=s' => \@pass,
+
+        # slurm gpu options (gpu-per-node is already supported via noderesource :gpu=X (-> --gres=gpus=X))
+        # TODO: directives support, incl in submitfilter? (#PBS --slurm-option --> #SBATCH --slurm-option)
+        'gpu=i' => \$gpu,
+        'cpus-per-gpu=i' => \$cpus_per_gpu,
+        'mem-per-gpu=s' => \$mem_per_gpu,
         )
         or pod2usage(2);
 
@@ -416,7 +425,20 @@ sub make_command
     }
     push(@command, "--nice=$res_opts->{nice}") if $res_opts->{nice};
 
-    push(@command, "--gres=gpu:$res_opts->{naccelerators}") if $res_opts->{naccelerators};
+    if ($res_opts->{naccelerators}) {
+        if ($gpu) {
+            fatal("You cannot define both :gpu=X node resource and the --gpu option")
+        } else {
+            push(@command, "--gres=gpu:$res_opts->{naccelerators}");
+        }
+    } elsif ($gpu) {
+        push(@command, "--gpu=$gpu");
+        # TODO: joltik defaults for now, to be read from vsc-jobs clusterdata
+        $cpus_per_gpu = 8 if !$cpus_per_gpu;
+        push(@command, "--cpus-per-gpu=$cpus_per_gpu");
+        $mem_per_gpu = "48G" if !$mem_per_gpu;
+        push(@command, "--mem-per-gpu=".convert_mb_format($mem_per_gpu));
+    }
 
     # Cray-specific options
     push(@command, "--ntasks=$res_opts->{mppwidth}") if $res_opts->{mppwidth};

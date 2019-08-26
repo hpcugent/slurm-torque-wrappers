@@ -30,9 +30,11 @@ my $salloc = which("salloc");
 # value = arrayref
 
 # default args
-my @da = qw(script arg1 -l nodes=2:ppn=4);
+my @sa = qw(script arg1);
+my @da = (@sa, qw(-l nodes=2:ppn=4));
 my @gda = (@da);
 $gda[-1] .= ":gpu=2";
+my @ga = (@sa, qw(--gpu=3));
 
 # default batch argument string
 my $dba = "--nodes=2 --ntasks=8 --ntasks-per-node=4";
@@ -52,8 +54,8 @@ my %comms = (
     "$dba $dsa", [@da],
     # should be equal
     "$dba --time=1 --mem=1024M $dsa Y", [qw(-l mem=1g,walltime=1), @da, 'Y'],
-    "$dba --time=1 --mem=1024M $dsa X", [qw(-l mem=1g -l walltime=1), @da, 'X'],
-    "$dba --time=1 --mem=1024M $dsa X", [@da, 'X', qw(-l vmem=1g -l walltime=1)],
+    "$dba --time=2 --mem=1024M $dsa X", [qw(-l mem=1g -l walltime=1:1), @da, 'X'],
+    "$dba --time=3 --mem=1024M $dsa X", [@da, 'X', qw(-l vmem=1g -l walltime=2:2)],
 
     "$dba --mem=2048M $dsa", [qw(-l vmem=2gb), @da],
     "$dba --mem-per-cpu=10M $dsa", [qw(-l pvmem=10mb), @da],
@@ -62,6 +64,7 @@ my %comms = (
     "$dba --begin=2018-11-21T16:00:00 $dsa", [qw(-a 1600), @da],
 
     "$dba --mem=2048M --gres=gpu:2 $dsa", [qw(-l vmem=2gb), @gda],
+    "--time=5 --gpu=3 --cpus-per-gpu=8 --mem-per-gpu=49152M $dsa", [qw(-l walltime=4:4), @ga],
     );
 
 =head1 test all commands in %comms hash
