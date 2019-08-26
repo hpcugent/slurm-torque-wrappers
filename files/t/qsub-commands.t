@@ -31,6 +31,9 @@ my $salloc = which("salloc");
 
 # default args
 my @da = qw(script arg1 -l nodes=2:ppn=4);
+my @gda = (@da);
+$gda[-1] .= ":gpu=2";
+
 # default batch argument string
 my $dba = "--nodes=2 --ntasks=8 --ntasks-per-node=4";
 # defaults
@@ -57,6 +60,8 @@ my %comms = (
     "$dba --mem-per-cpu=20M $dsa", [qw(-l pmem=20mb), @da],
     "$dba --abc=123 --def=456 $dsa", [qw(--pass=abc=123 --pass=def=456), @da],
     "$dba --begin=2018-11-21T16:00:00 $dsa", [qw(-a 1600), @da],
+
+    "$dba --mem=2048M --gres=gpu:2 $dsa", [qw(-l vmem=2gb), @gda],
     );
 
 =head1 test all commands in %comms hash

@@ -660,7 +660,7 @@ sub parse_script
         }
         @check_eo = ('o');
     }
-    
+
     # check wheter the -o and -e directives are directory
     # if yes, then set the path for slurm.
     foreach my $dir (@check_eo) {
@@ -991,7 +991,11 @@ sub parse_all_resource_list
 
     if ($res_opts->{nodes}) {
         $node_opts = parse_node_opts($res_opts->{nodes});
+        my $nacc = delete $node_opts->{nacc};
+        # do not override the ,naccelerators=X with the :gpu=X
+        $res_opts->{naccelerators} = $nacc if $nacc && ! defined($res_opts->{naccelerators});
     }
+
     if ($res_opts->{select} && (!$node_opts->{node_cnt} || ($res_opts->{select} > $node_opts->{node_cnt}))) {
         $node_opts->{node_cnt} = $res_opts->{select};
     }
@@ -1015,12 +1019,21 @@ sub parse_node_opts
     my %opt = (
         'node_cnt' => 0,
         'hostlist' => "",
-        'task_cnt' => 0
+        'task_cnt' => 0,
+        'nacc' => 0,
         );
     my $max_ppn;
     while ($node_string =~ /ppn=(\d+)/g) {
         $opt{task_cnt} += $1;
         $max_ppn = $1 if !$max_ppn || ($1 > $max_ppn);
+    }
+
+    while ($node_string =~ /gpu(=(\d+))?/g) {
+        if ($opt{nacc}) {
+            fatal("No support for (mixed) number of gpus over multiple nodes");
+        } else {
+            $opt{nacc} = $2 || 1;
+        }
     }
 
     $opt{max_ppn} = $max_ppn if defined $max_ppn;
@@ -1031,7 +1044,7 @@ sub parse_node_opts
     foreach my $part (@parts) {
         my @sub_parts = split(/:/, $part);
         foreach my $sub_part (@sub_parts) {
-            if ($sub_part =~ /ppn=(\d+)/) {
+            if ($sub_part =~ /(ppn=\d+|gpu(=\d+)?)/) {
                 next;
             } elsif ($sub_part =~ /^(\d+)/) {
                 $opt{node_cnt} += $1;
@@ -1044,7 +1057,7 @@ sub parse_node_opts
     }
 
     $opt{hostlist} = Slurm::Hostlist::ranged_string($hl);
-    if ($opt{hostlist} =~ m{ppn=(all|half)}) {
+    if (($opt{hostlist} || '') =~ m{ppn=(all|half)}) {
         fatal("Cannot determine number of processors for ppn={all,half}");
     }
 
