@@ -43,7 +43,9 @@ my %resc = (
     "walltime=1,nodes=2,mem=2g" => [{mem => '2048M', nodes => 2, walltime => 1}, [qw(mem nodes walltime)]],
     "walltime=100:5:5,nodes=123:ppn=123" => [{nodes => '123:ppn=123', walltime => 100*60+5+1}, [qw(nodes walltime)]],
     "nodes=123:ppn=123:gpu" => [{nodes => '123:ppn=123:gpu'}, [qw(nodes)]],
-    "nodes=123:ppn=123,naccelerators=2" => [{naccelerators => '2', nodes => '123:ppn=123'}, [qw(naccelerators nodes)]],
+    "nodes=124:ppn=124,naccelerators=2" => [{naccelerators => '2', nodes => '124:ppn=124'}, [qw(naccelerators nodes)]],
+    "nodes=125:ppn=125,gpus=3" => [{naccelerators => '3', nodes => '125:ppn=125'}, [qw(gpus nodes)]],
+    "gpus=4" => [{naccelerators => '4'}, [qw(gpus)]],
     );
 
 foreach my $resctxt (sort keys %resc) {

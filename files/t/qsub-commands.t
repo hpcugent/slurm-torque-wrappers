@@ -63,6 +63,8 @@ my %comms = (
     "$dba --abc=123 --def=456 $dsa", [qw(--pass=abc=123 --pass=def=456), @da],
     "$dba --begin=2018-11-21T16:00:00 $dsa", [qw(-a 1600), @da],
 
+    "--gres=gpu:2 --cpus-per-gpu=8 --mem-per-gpu=49152M $dsa", [qw(-l gpus=2), @sa],
+    "$dba --gres=gpu:2 --mem-per-gpu=49152M $dsa", [@gda],
     "$dba --mem=2048M --gres=gpu:2 $dsa", [qw(-l vmem=2gb), @gda],
     "--time=5 --gpus=3 --cpus-per-gpu=8 --mem-per-gpu=49152M $dsa", [qw(-l walltime=4:4), @ga],
     );

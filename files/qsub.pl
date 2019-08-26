@@ -425,6 +425,7 @@ sub make_command
     }
     push(@command, "--nice=$res_opts->{nice}") if $res_opts->{nice};
 
+    # TODO: support all/half for both -l gpus and --gpus
     if ($res_opts->{naccelerators}) {
         if ($gpus) {
             fatal("You cannot define both :gpu=X node resource and the --gpus option")
@@ -433,12 +434,19 @@ sub make_command
         }
     } elsif ($gpus) {
         push(@command, "--gpus=$gpus");
-        # TODO: joltik defaults for now, to be read from vsc-jobs clusterdata
-        $cpus_per_gpu = 8 if !$cpus_per_gpu;
-        push(@command, "--cpus-per-gpu=$cpus_per_gpu");
-        $mem_per_gpu = "48G" if !$mem_per_gpu;
-        push(@command, "--mem-per-gpu=".convert_mb_format($mem_per_gpu));
     }
+
+    # TODO: handle node resource GPUs too. might/will conflict with node resourfces such as vmem etc etc
+    #       needs support in submitfilter too?
+    #       This is a way too simple first attempt. needs to be understood how slurm handles these combos
+    # TODO: joltik defaults for now, to be read from vsc-jobs clusterdata
+    $cpus_per_gpu = 8 if !$cpus_per_gpu;
+    push(@command, "--cpus-per-gpu=$cpus_per_gpu") if
+        $gpus || ($res_opts->{naccelerators} && ! $res_opts->{mppnppn});
+
+    $mem_per_gpu = "48G" if !$mem_per_gpu;
+    push(@command, "--mem-per-gpu=".convert_mb_format($mem_per_gpu)) if
+        $gpus || ($res_opts->{naccelerators} && ! ($res_opts->{mem} || $res_opts->{pmem}));
 
     # Cray-specific options
     push(@command, "--ntasks=$res_opts->{mppwidth}") if $res_opts->{mppwidth};
@@ -876,6 +884,7 @@ sub parse_resource_list
         'nice' => "",
         'nodes' => "",
         'naccelerators' => "",
+        'gpus' => "",  # alias for naccelerators
         'opsys' => "",
         'other' => "",
         'pcput' => "",
@@ -921,6 +930,15 @@ sub parse_resource_list
         $opt{walltime} =~ s/(\d+)h(\d{1,2})m(\d{1,2})s/$1:$2:$3/;
         # Convert to minutes for SLURM.
         $opt{walltime} = get_minutes($opt{walltime});
+    }
+
+    if ($opt{gpus}) {
+        # alias for naccelerators
+        if ($opt{naccelerators}) {
+            fatal("You cannot specify both naccelerators and gpus as a node resource")
+        } else {
+            $opt{naccelerators} = delete $opt{gpus};
+        }
     }
 
     if ($opt{accelerator} &&
@@ -1384,8 +1402,11 @@ multiple options; do not contruct one long command string.
 
 =item B<-G> | B<--gpus>
 
-Count of GPUs required for the job. Instead of asking nodes and gpus per node
-(via the C<-l nodes=X:gpu=Y> nore resource option), just specify the gpus you need.
+Count of GPUs required for the job. This does not garantee anything wrt the number of GPUs per node,
+or the total number of nodes. If you want e.g. X GPUs on one node, specify C<-l gpus=X>
+(as the node resource, with 1 node as default number of nodes per job),
+or more generic X GPUs on Y nodes  C<-l nodes=Y,gpus=X>
+(or equivalent C<-l nodes=Y:gpu=X> (mind the singular 'gpu' for the latter)).
 
 =item B<--cpus-per-gpu>
 
