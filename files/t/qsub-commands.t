@@ -33,7 +33,7 @@ my $salloc = which("salloc");
 my @sa = qw(script arg1);
 my @da = (@sa, qw(-l nodes=2:ppn=4));
 my @gda = (@da);
-$gda[-1] .= ":gpu=2";
+$gda[-1] .= ":gpus=2";
 my @ga = (@sa, qw(--gpus=3));
 
 # default batch argument string

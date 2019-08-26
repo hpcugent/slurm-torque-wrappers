@@ -210,7 +210,7 @@ sub make_command
         'debug|D'      => \$debug,
         'pass=s' => \@pass,
 
-        # slurm gpu options (gpu-per-node is already supported via noderesource :gpu=X (-> --gres=gpu=X))
+        # slurm gpu options (gpu-per-node is already supported via noderesource :gpus=X (-> --gres=gpu=X))
         # TODO: directives support, incl in submitfilter? (#PBS --slurm-option --> #SBATCH --slurm-option)
         'gpus|G=i' => \$gpus,
         'cpus-per-gpu=i' => \$cpus_per_gpu,
@@ -1068,7 +1068,7 @@ sub parse_node_opts
         $max_ppn = $1 if !$max_ppn || ($1 > $max_ppn);
     }
 
-    while ($node_string =~ /gpu(=(\d+))?/g) {
+    while ($node_string =~ /gpus(=(\d+))?/g) {
         if ($opt{nacc}) {
             fatal("No support for (mixed) number of gpus over multiple nodes");
         } else {
@@ -1084,7 +1084,7 @@ sub parse_node_opts
     foreach my $part (@parts) {
         my @sub_parts = split(/:/, $part);
         foreach my $sub_part (@sub_parts) {
-            if ($sub_part =~ /(ppn=\d+|gpu(=\d+)?)/) {
+            if ($sub_part =~ /(ppn=\d+|gpus(=\d+)?)/) {
                 next;
             } elsif ($sub_part =~ /^(\d+)/) {
                 $opt{node_cnt} += $1;
@@ -1406,7 +1406,7 @@ Count of GPUs required for the job. This does not garantee anything wrt the numb
 or the total number of nodes. If you want e.g. X GPUs on one node, specify C<-l gpus=X>
 (as the node resource, with 1 node as default number of nodes per job),
 or more generic X GPUs on Y nodes  C<-l nodes=Y,gpus=X>
-(or equivalent C<-l nodes=Y:gpu=X> (mind the singular 'gpu' for the latter)).
+(or equivalent C<-l nodes=Y:gpus=X>).
 
 =item B<--cpus-per-gpu>
 
