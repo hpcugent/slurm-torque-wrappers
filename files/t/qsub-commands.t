@@ -34,7 +34,7 @@ my @sa = qw(script arg1);
 my @da = (@sa, qw(-l nodes=2:ppn=4));
 my @gda = (@da);
 $gda[-1] .= ":gpu=2";
-my @ga = (@sa, qw(--gpu=3));
+my @ga = (@sa, qw(--gpus=3));
 
 # default batch argument string
 my $dba = "--nodes=2 --ntasks=8 --ntasks-per-node=4";
@@ -64,7 +64,7 @@ my %comms = (
     "$dba --begin=2018-11-21T16:00:00 $dsa", [qw(-a 1600), @da],
 
     "$dba --mem=2048M --gres=gpu:2 $dsa", [qw(-l vmem=2gb), @gda],
-    "--time=5 --gpu=3 --cpus-per-gpu=8 --mem-per-gpu=49152M $dsa", [qw(-l walltime=4:4), @ga],
+    "--time=5 --gpus=3 --cpus-per-gpu=8 --mem-per-gpu=49152M $dsa", [qw(-l walltime=4:4), @ga],
     );
 
 =head1 test all commands in %comms hash

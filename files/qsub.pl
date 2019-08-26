@@ -171,7 +171,7 @@ sub make_command
         $resp,
         $man,
         @pass,
-        $gpu,
+        $gpus,
         $cpus_per_gpu,
         $mem_per_gpu,
         );
@@ -210,9 +210,9 @@ sub make_command
         'debug|D'      => \$debug,
         'pass=s' => \@pass,
 
-        # slurm gpu options (gpu-per-node is already supported via noderesource :gpu=X (-> --gres=gpus=X))
+        # slurm gpu options (gpu-per-node is already supported via noderesource :gpu=X (-> --gres=gpu=X))
         # TODO: directives support, incl in submitfilter? (#PBS --slurm-option --> #SBATCH --slurm-option)
-        'gpu=i' => \$gpu,
+        'gpus|G=i' => \$gpus,
         'cpus-per-gpu=i' => \$cpus_per_gpu,
         'mem-per-gpu=s' => \$mem_per_gpu,
         )
@@ -426,13 +426,13 @@ sub make_command
     push(@command, "--nice=$res_opts->{nice}") if $res_opts->{nice};
 
     if ($res_opts->{naccelerators}) {
-        if ($gpu) {
-            fatal("You cannot define both :gpu=X node resource and the --gpu option")
+        if ($gpus) {
+            fatal("You cannot define both :gpu=X node resource and the --gpus option")
         } else {
             push(@command, "--gres=gpu:$res_opts->{naccelerators}");
         }
-    } elsif ($gpu) {
-        push(@command, "--gpu=$gpu");
+    } elsif ($gpus) {
+        push(@command, "--gpus=$gpus");
         # TODO: joltik defaults for now, to be read from vsc-jobs clusterdata
         $cpus_per_gpu = 8 if !$cpus_per_gpu;
         push(@command, "--cpus-per-gpu=$cpus_per_gpu");
@@ -1381,6 +1381,19 @@ e.g. C<--pass=constraint=alist> will add C<--constraint=alist>.
 
 Short optionnames are not supported. Combine multiple C<pass> options to pass
 multiple options; do not contruct one long command string.
+
+=item B<-G> | B<--gpus>
+
+Count of GPUs required for the job. Instead of asking nodes and gpus per node
+(via the C<-l nodes=X:gpu=Y> nore resource option), just specify the gpus you need.
+
+=item B<--cpus-per-gpu>
+
+Number of CPUs required per allocated GPU (via the C<-G>/C<--gpus> option). Defaults to 8.
+
+=item B<--mem-per-gpu>
+
+Memory required per allocated GPU (via the C<-G>/C<--gpus> option). Defaults to 48GB.
 
 =back
 
