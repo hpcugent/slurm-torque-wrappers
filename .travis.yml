@@ -1,6 +1,6 @@
 language: perl
 perl:
-  - "5.18"
+  - "5.22"
 install:
       - cpanm -f -n Switch Test::MockModule IPC::Run List::Util File::Basename Pod::Usage
 script:

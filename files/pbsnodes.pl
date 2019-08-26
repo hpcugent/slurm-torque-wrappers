@@ -126,41 +126,47 @@ Main:
     foreach my $node (@{$resp->{node_array}}) {
             #print STDERR join(",",keys($node))."\n";
 	    next unless (defined $node);
-	    next unless (keys %{$node});
-	    my $nodeId    = $node->{'name'};
-	    my $rCProc    = $node->{'cpus'};
-	    my $rBoards   = $node->{'boards'};
-	    my $rSockets  = $node->{'sockets'};
-            my $rCores    = $node->{'cores'};
-            my $rThreads  = $node->{'threads'};
-	    my $features  = $node->{'features'};
-	    my $rAMem     = $node->{'real_memory'};
-	    my $rAProc    = ($node->{'cpus'} -
-		    ($node->{'alloc_cpus'} + $node->{'err_cpus'}));
-	    my $state     = lc(Slurm->node_state_string($node->{'node_state'}));
-            my $reason    = $node->{'reason'};
-	    my $gres      = $node->{'gres'};
-	    if ( !defined $node->{'os'} ) {
-		$node->{'os'} = "unknown";
+	    next unless (keys %$node);
+	    my $nodeId    = $node->{name};
+	    my $rCProc    = $node->{cpus};
+	    my $rBoards   = $node->{boards};
+	    my $rSockets  = $node->{sockets};
+            my $rCores    = $node->{cores};
+            my $rThreads  = $node->{threads};
+	    my $features  = $node->{features};
+	    my $rAMem     = $node->{real_memory};
+	    my $rAProc    = ($node->{cpus} -
+		    ($node->{alloc_cpus} + ($node->{err_cpus} || 0)));
+	    my $state     = lc(Slurm->node_state_string($node->{node_state}));
+            my $reason    = $node->{reason};
+	    my $gres      = $node->{gres};
+	    if ( !defined $node->{os} ) {
+            $node->{os} = "unknown";
 	    }
-	    my $os        = lc($node->{'os'});
-	    my $arch      = $node->{'arch'};
-	    my $disksize  = $node->{'tmp_disk'};
+	    my $os        = lc($node->{os});
+	    my $arch      = $node->{arch};
+	    my $disksize  = $node->{tmp_disk};
 
 	    # deal w/ specific types of gres
 	    my $gpus = 0;
 	    my $mics = 0;
+	    my $mps = 0;
 	    if ( defined $gres ) {
-                  my @gres = split(/,/,$gres);
-                  foreach my $grestype ( @gres ) {
-                          my @elt = split(/:/,$grestype);
-			  if ( $#elt>0 && $elt[0] eq "gpu" ) {
-			          $gpus = int($elt[-1]);
-			  }
-			  if ( $#elt>0 && $elt[0] eq "mic" ) {
-			          $mics = int($elt[-1]);
-			  }
-		  }
+            my @gres = split(/,/,$gres);
+            foreach my $grestype ( @gres ) {
+                # strip socket info
+                $grestype =~ s/\(.*?\)$//;
+                my @elt = split(/:/, $grestype);
+                if ( $#elt>0 && $elt[0] eq "gpu" ) {
+                    $gpus = int($elt[-1]);
+                }
+                if ( $#elt>0 && $elt[0] eq "mic" ) {
+                    $mics = int($elt[-1]);
+                }
+                if ( $#elt>0 && $elt[0] eq "mps" ) {
+                    $mps = int($elt[-1]);
+                }
+            }
 	    }
 
             # find job(s) on node
@@ -221,6 +227,7 @@ Main:
 		    printf "    note = %s\n", $reason if defined $reason;
 		    printf "    gpus = %d\n", $gpus if $gpus>0;
 		    printf "    mics = %d\n", $mics if $mics>0;
+		    printf "    mps  = %d\n", $mps if $mps>0;
 	            print "\n";
 	     } else {
 	            if ( $state =~ /drained|down/i ) {

@@ -170,7 +170,10 @@ sub make_command
         $help,
         $resp,
         $man,
-        @pass
+        @pass,
+        $gpus,
+        $cpus_per_gpu,
+        $mem_per_gpu,
         );
 
     GetOptions(
@@ -206,6 +209,12 @@ sub make_command
         'sbatchline|dryrun' => \$dryrun,
         'debug|D'      => \$debug,
         'pass=s' => \@pass,
+
+        # slurm gpu options (gpu-per-node is already supported via noderesource :gpus=X (-> --gres=gpu=X))
+        # TODO: directives support, incl in submitfilter? (#PBS --slurm-option --> #SBATCH --slurm-option)
+        'gpus|G=i' => \$gpus,
+        'cpus-per-gpu=i' => \$cpus_per_gpu,
+        'mem-per-gpu=s' => \$mem_per_gpu,
         )
         or pod2usage(2);
 
@@ -416,7 +425,28 @@ sub make_command
     }
     push(@command, "--nice=$res_opts->{nice}") if $res_opts->{nice};
 
-    push(@command, "--gres=gpu:$res_opts->{naccelerators}") if $res_opts->{naccelerators};
+    # TODO: support all/half for both -l gpus and --gpus
+    if ($res_opts->{naccelerators}) {
+        if ($gpus) {
+            fatal("You cannot define both :gpu=X node resource and the --gpus option")
+        } else {
+            push(@command, "--gres=gpu:$res_opts->{naccelerators}");
+        }
+    } elsif ($gpus) {
+        push(@command, "--gpus=$gpus");
+    }
+
+    # TODO: handle node resource GPUs too. might/will conflict with node resourfces such as vmem etc etc
+    #       needs support in submitfilter too?
+    #       This is a way too simple first attempt. needs to be understood how slurm handles these combos
+    # TODO: joltik defaults for now, to be read from vsc-jobs clusterdata
+    $cpus_per_gpu = 8 if !$cpus_per_gpu;
+    push(@command, "--cpus-per-gpu=$cpus_per_gpu") if
+        $gpus || ($res_opts->{naccelerators} && ! $res_opts->{mppnppn});
+
+    $mem_per_gpu = "48G" if !$mem_per_gpu;
+    push(@command, "--mem-per-gpu=".convert_mb_format($mem_per_gpu)) if
+        $gpus || ($res_opts->{naccelerators} && ! ($res_opts->{mem} || $res_opts->{pmem}));
 
     # Cray-specific options
     push(@command, "--ntasks=$res_opts->{mppwidth}") if $res_opts->{mppwidth};
@@ -660,7 +690,7 @@ sub parse_script
         }
         @check_eo = ('o');
     }
-    
+
     # check wheter the -o and -e directives are directory
     # if yes, then set the path for slurm.
     foreach my $dir (@check_eo) {
@@ -854,6 +884,7 @@ sub parse_resource_list
         'nice' => "",
         'nodes' => "",
         'naccelerators' => "",
+        'gpus' => "",  # alias for naccelerators
         'opsys' => "",
         'other' => "",
         'pcput' => "",
@@ -899,6 +930,15 @@ sub parse_resource_list
         $opt{walltime} =~ s/(\d+)h(\d{1,2})m(\d{1,2})s/$1:$2:$3/;
         # Convert to minutes for SLURM.
         $opt{walltime} = get_minutes($opt{walltime});
+    }
+
+    if ($opt{gpus}) {
+        # alias for naccelerators
+        if ($opt{naccelerators}) {
+            fatal("You cannot specify both naccelerators and gpus as a node resource")
+        } else {
+            $opt{naccelerators} = delete $opt{gpus};
+        }
     }
 
     if ($opt{accelerator} &&
@@ -991,7 +1031,11 @@ sub parse_all_resource_list
 
     if ($res_opts->{nodes}) {
         $node_opts = parse_node_opts($res_opts->{nodes});
+        my $nacc = delete $node_opts->{nacc};
+        # do not override the ,naccelerators=X with the :gpu=X
+        $res_opts->{naccelerators} = $nacc if $nacc && ! defined($res_opts->{naccelerators});
     }
+
     if ($res_opts->{select} && (!$node_opts->{node_cnt} || ($res_opts->{select} > $node_opts->{node_cnt}))) {
         $node_opts->{node_cnt} = $res_opts->{select};
     }
@@ -1015,12 +1059,21 @@ sub parse_node_opts
     my %opt = (
         'node_cnt' => 0,
         'hostlist' => "",
-        'task_cnt' => 0
+        'task_cnt' => 0,
+        'nacc' => 0,
         );
     my $max_ppn;
     while ($node_string =~ /ppn=(\d+)/g) {
         $opt{task_cnt} += $1;
         $max_ppn = $1 if !$max_ppn || ($1 > $max_ppn);
+    }
+
+    while ($node_string =~ /gpus(=(\d+))?/g) {
+        if ($opt{nacc}) {
+            fatal("No support for (mixed) number of gpus over multiple nodes");
+        } else {
+            $opt{nacc} = $2 || 1;
+        }
     }
 
     $opt{max_ppn} = $max_ppn if defined $max_ppn;
@@ -1031,7 +1084,7 @@ sub parse_node_opts
     foreach my $part (@parts) {
         my @sub_parts = split(/:/, $part);
         foreach my $sub_part (@sub_parts) {
-            if ($sub_part =~ /ppn=(\d+)/) {
+            if ($sub_part =~ /(ppn=\d+|gpus(=\d+)?)/) {
                 next;
             } elsif ($sub_part =~ /^(\d+)/) {
                 $opt{node_cnt} += $1;
@@ -1044,7 +1097,7 @@ sub parse_node_opts
     }
 
     $opt{hostlist} = Slurm::Hostlist::ranged_string($hl);
-    if ($opt{hostlist} =~ m{ppn=(all|half)}) {
+    if (($opt{hostlist} || '') =~ m{ppn=(all|half)}) {
         fatal("Cannot determine number of processors for ppn={all,half}");
     }
 
@@ -1346,6 +1399,22 @@ e.g. C<--pass=constraint=alist> will add C<--constraint=alist>.
 
 Short optionnames are not supported. Combine multiple C<pass> options to pass
 multiple options; do not contruct one long command string.
+
+=item B<-G> | B<--gpus>
+
+Count of GPUs required for the job. This does not garantee anything wrt the number of GPUs per node,
+or the total number of nodes. If you want e.g. X GPUs on one node, specify C<-l gpus=X>
+(as the node resource, with 1 node as default number of nodes per job),
+or more generic X GPUs on Y nodes  C<-l nodes=Y,gpus=X>
+(or equivalent C<-l nodes=Y:gpus=X>).
+
+=item B<--cpus-per-gpu>
+
+Number of CPUs required per allocated GPU (via the C<-G>/C<--gpus> option). Defaults to 8.
+
+=item B<--mem-per-gpu>
+
+Memory required per allocated GPU (via the C<-G>/C<--gpus> option). Defaults to 48GB.
 
 =back
 

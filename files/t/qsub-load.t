@@ -42,6 +42,10 @@ my %resc = (
     "" => [{},[]],
     "walltime=1,nodes=2,mem=2g" => [{mem => '2048M', nodes => 2, walltime => 1}, [qw(mem nodes walltime)]],
     "walltime=100:5:5,nodes=123:ppn=123" => [{nodes => '123:ppn=123', walltime => 100*60+5+1}, [qw(nodes walltime)]],
+    "nodes=123:ppn=123:gpus" => [{nodes => '123:ppn=123:gpus'}, [qw(nodes)]],
+    "nodes=124:ppn=124,naccelerators=2" => [{naccelerators => '2', nodes => '124:ppn=124'}, [qw(naccelerators nodes)]],
+    "nodes=125:ppn=125,gpus=3" => [{naccelerators => '3', nodes => '125:ppn=125'}, [qw(gpus nodes)]],
+    "gpus=4" => [{naccelerators => '4'}, [qw(gpus)]],
     );
 
 foreach my $resctxt (sort keys %resc) {
@@ -50,7 +54,7 @@ foreach my $resctxt (sort keys %resc) {
     $mat = [sort @$mat];
     # strip undefs
     $rsc = {map {$_ => $rsc->{$_}} grep {defined $rsc->{$_}} sort keys %$rsc};
-    diag "resource '$resctxt' ", explain $rsc, " matches ", $mat;
+    diag "resource '$resctxt' ", explain $rsc, " matches ", explain $mat;
     is_deeply($rsc, $resc{$resctxt}->[0], "converted rescource list '$resctxt'");
     is_deeply($mat, $resc{$resctxt}->[1], "converted rescource list '$resctxt' matches");
 }
@@ -61,9 +65,11 @@ foreach my $resctxt (sort keys %resc) {
 
 # the part after nodes=
 my %nopts = (
-    "1" => {hostlist => undef, node_cnt => 1, task_cnt => 0},
-    "123:ppn=321" => {hostlist => undef, node_cnt => 123, task_cnt => 321, max_ppn => 321},
-    "host1+host2:ppn=3" => {hostlist => undef, node_cnt => 0, task_cnt => 3, max_ppn => 3}, # TODO: fix this
+    "1" => {hostlist => undef, node_cnt => 1, task_cnt => 0, nacc => 0},
+    "123:ppn=321" => {hostlist => undef, node_cnt => 123, task_cnt => 321, max_ppn => 321, nacc => 0},
+    "host1+host2:ppn=3" => {hostlist => undef, node_cnt => 0, task_cnt => 3, max_ppn => 3, nacc => 0}, # TODO: fix this
+    "1:gpus" => {hostlist => undef, node_cnt => 1, task_cnt => 0, nacc => 1},
+    "5:ppn=4:gpus=3" => {hostlist => undef, node_cnt => 5, task_cnt => 4, max_ppn => 4, nacc => 3},
     );
 
 foreach my $notxt (sort keys %nopts) {
