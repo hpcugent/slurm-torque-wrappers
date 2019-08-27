@@ -431,18 +431,22 @@ sub make_command
             fatal("You cannot define both :gpu=X node resource and the --gpus option")
         } else {
             push(@command, "--gres=gpu:$res_opts->{naccelerators}");
+            push(@intcommand, '--gres=gpu:0') if $interactive;
         }
     } elsif ($gpus) {
         push(@command, "--gpus=$gpus");
+        push(@intcommand, '--gpus=0') if $interactive;
         # apparently, only when --gpus is set (according to man page)
         push(@command, "--cpus-per-gpu=$cpus_per_gpu") if $cpus_per_gpu;
+        # no equivalent for interactive?
     }
 
     # TODO: handle node resource GPUs too. might/will conflict with node resourfces such as vmem etc etc
     #       needs support in submitfilter too?
     #       This is a way too simple first attempt. needs to be understood how slurm handles these combos
-    push(@command, "--mem-per-gpu=".convert_mb_format($mem_per_gpu)) if
-        $mem_per_gpu && ($gpus || ($res_opts->{naccelerators} && ! ($res_opts->{mem} || $res_opts->{pmem})));
+    my $add_mempergpu = $gpus || ($res_opts->{naccelerators} && ! ($res_opts->{mem} || $res_opts->{pmem}));
+    push(@command, "--mem-per-gpu=".convert_mb_format($mem_per_gpu)) if $mem_per_gpu && $add_mempergpu;
+    push(@intcommand, "--mem-per-gpu=0") if $interactive && $add_mempergpu;  # TODO: always add this when gpus or nacc is defined?
 
     # Cray-specific options
     push(@command, "--ntasks=$res_opts->{mppwidth}") if $res_opts->{mppwidth};
