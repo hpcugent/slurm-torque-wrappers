@@ -434,19 +434,15 @@ sub make_command
         }
     } elsif ($gpus) {
         push(@command, "--gpus=$gpus");
+        # apparently, only when --gpus is set (according to man page)
+        push(@command, "--cpus-per-gpu=$cpus_per_gpu") if $cpus_per_gpu;
     }
 
     # TODO: handle node resource GPUs too. might/will conflict with node resourfces such as vmem etc etc
     #       needs support in submitfilter too?
     #       This is a way too simple first attempt. needs to be understood how slurm handles these combos
-    # TODO: joltik defaults for now, to be read from vsc-jobs clusterdata
-    $cpus_per_gpu = 8 if !$cpus_per_gpu;
-    push(@command, "--cpus-per-gpu=$cpus_per_gpu") if
-        $gpus || ($res_opts->{naccelerators} && ! $res_opts->{mppnppn});
-
-    $mem_per_gpu = "48G" if !$mem_per_gpu;
     push(@command, "--mem-per-gpu=".convert_mb_format($mem_per_gpu)) if
-        $gpus || ($res_opts->{naccelerators} && ! ($res_opts->{mem} || $res_opts->{pmem}));
+        $mem_per_gpu && ($gpus || ($res_opts->{naccelerators} && ! ($res_opts->{mem} || $res_opts->{pmem})));
 
     # Cray-specific options
     push(@command, "--ntasks=$res_opts->{mppwidth}") if $res_opts->{mppwidth};
@@ -1410,11 +1406,11 @@ or more generic X GPUs on Y nodes  C<-l nodes=Y,gpus=X>
 
 =item B<--cpus-per-gpu>
 
-Number of CPUs required per allocated GPU (via the C<-G>/C<--gpus> option). Defaults to 8.
+Number of CPUs required per allocated GPU (via the C<-G>/C<--gpus> option).
 
 =item B<--mem-per-gpu>
 
-Memory required per allocated GPU (via the C<-G>/C<--gpus> option). Defaults to 48GB.
+Memory required per allocated GPU (via the C<-G>/C<--gpus> option).
 
 =back
 
