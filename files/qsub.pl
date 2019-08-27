@@ -310,7 +310,7 @@ sub make_command
         @command = (which(SALLOC));
         @intcommand = (which('srun'), '--pty', '--mem-per-cpu=0');
         $defaults->{J} = "INTERACTIVE" if exists($defaults->{J});
-        $defaults->{'cpu-bind'} = 'v,none';
+        $defaults->{'cpu-bind'} = 'none';
 
         # Always want at least one node in the allocation
         if (!$node_opts->{node_cnt} && !$fake) {
