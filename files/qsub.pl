@@ -428,11 +428,16 @@ sub make_command
     # TODO: support all/half for both -l gpus and --gpus
     if ($res_opts->{naccelerators}) {
         if ($gpus) {
-            fatal("You cannot define both :gpu=X node resource and the --gpus option")
+            fatal("You cannot define both :gpus=X/-l gpus=X node resource and the --gpus option")
         } else {
             push(@command, "--gres=gpu:$res_opts->{naccelerators}");
             push(@intcommand, '--gres=gpu:0') if $interactive;
         }
+
+        if ($cpus_per_gpu) {
+            fatal("--cpus-per-gpu requires --gpus option (and thus conflicts with :gpus/-l gpus")
+        }
+
     } elsif ($gpus) {
         push(@command, "--gpus=$gpus");
         push(@intcommand, '--gpus=0') if $interactive;

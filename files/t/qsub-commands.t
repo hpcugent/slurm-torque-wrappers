@@ -63,10 +63,10 @@ my %comms = (
     "$dba --abc=123 --def=456 $dsa", [qw(--pass=abc=123 --pass=def=456), @da],
     "$dba --begin=2018-11-21T16:00:00 $dsa", [qw(-a 1600), @da],
 
-    "--gres=gpu:2 --cpus-per-gpu=8 --mem-per-gpu=49152M $dsa", [qw(-l gpus=2), @sa],
-    "$dba --gres=gpu:2 --mem-per-gpu=49152M $dsa", [@gda],
+    "--gres=gpu:2 --mem-per-gpu=123M $dsa", [qw(-l gpus=2 --mem-per-gpu=123M), @sa],
+    "$dba --gres=gpu:2 $dsa", [@gda],
     "$dba --mem=2048M --gres=gpu:2 $dsa", [qw(-l vmem=2gb), @gda],
-    "--time=5 --gpus=3 --cpus-per-gpu=8 --mem-per-gpu=49152M $dsa", [qw(-l walltime=4:4), @ga],
+    "--time=5 --gpus=3 --cpus-per-gpu=10 --mem-per-gpu=456M $dsa", [qw(-l walltime=4:4 --cpus-per-gpu=10 --mem-per-gpu=456M), @ga],
     );
 
 =head1 test all commands in %comms hash
@@ -133,7 +133,7 @@ is(join(" ", @$newcommand), $txt, "expected command after parse_script without e
 @ARGV = ('-I', '-l', 'nodes=2:ppn=4', '-l', 'vmem=2gb');
 ($mode, $command, $block, $script, $script_args, $defaults) = make_command($submitfilter);
 diag "interactive command @$command default ", explain $defaults;
-$txt = "$dba --mem=2048M srun --pty --mem-per-cpu=0";
+$txt = "$dba --mem=2048M srun --pty --mem-per-cpu=0 -N 1 -n 1";
 is(join(" ", @$command), "$salloc $txt", "expected command for interactive");
 $script =~ s#^/usr##;
 is($script, '/bin/bash', "interactive script value is the bash shell command");
@@ -144,12 +144,12 @@ ok(!($mode & 1 << 2), "no dryrun mode w interactive");
 is_deeply($defaults, {
     J => 'INTERACTIVE',
     export => 'USER,HOME,TERM',
-    'cpu-bind' => 'v,none',
+    'cpu-bind' => 'none',
     chdir => $ENV{HOME},
 }, "interactive defaults");
 
 # no 'bash -i'
-$txt = "$salloc -J INTERACTIVE $txt --chdir=$ENV{HOME} --cpu-bind=v,none --export=USER,HOME,TERM";
+$txt = "$salloc -J INTERACTIVE $txt --chdir=$ENV{HOME} --cpu-bind=none --export=USER,HOME,TERM";
 ($newtxt, $newcommand) = parse_script(undef, $command, $defaults);
 ok(!defined($newtxt), "no text for interactive job");
 is(join(" ", @$newcommand), $txt, "expected command after parse with interactive");
