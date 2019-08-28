@@ -133,7 +133,7 @@ is(join(" ", @$newcommand), $txt, "expected command after parse_script without e
 @ARGV = ('-I', '-l', 'nodes=2:ppn=4', '-l', 'vmem=2gb');
 ($mode, $command, $block, $script, $script_args, $defaults) = make_command($submitfilter);
 diag "interactive command @$command default ", explain $defaults;
-$txt = "$dba --mem=2048M srun --pty --mem-per-cpu=0 -N 1 -n 1";
+$txt = "$dba --mem=2048M srun --pty --mem-per-cpu=0";
 is(join(" ", @$command), "$salloc $txt", "expected command for interactive");
 $script =~ s#^/usr##;
 is($script, '/bin/bash', "interactive script value is the bash shell command");
