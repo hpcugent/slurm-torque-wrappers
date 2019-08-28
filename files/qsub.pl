@@ -310,7 +310,7 @@ sub make_command
         @command = (which(SALLOC));
         @intcommand = (which('srun'), '--pty', '--mem-per-cpu=0');
         $defaults->{J} = "INTERACTIVE" if exists($defaults->{J});
-        $defaults->{'cpu-bind'} = 'v,none';
+        $defaults->{'cpu-bind'} = 'none';
 
         # Always want at least one node in the allocation
         if (!$node_opts->{node_cnt} && !$fake) {
@@ -426,27 +426,36 @@ sub make_command
     push(@command, "--nice=$res_opts->{nice}") if $res_opts->{nice};
 
     # TODO: support all/half for both -l gpus and --gpus
+    my $has_gpu;
     if ($res_opts->{naccelerators}) {
         if ($gpus) {
-            fatal("You cannot define both :gpu=X node resource and the --gpus option")
+            fatal("You cannot define both :gpus=X/-l gpus=X node resource and the --gpus option")
         } else {
             push(@command, "--gres=gpu:$res_opts->{naccelerators}");
+            push(@intcommand, '--gres=gpu:0') if $interactive;
         }
+
+        if ($cpus_per_gpu) {
+            fatal("--cpus-per-gpu requires --gpus option (and thus conflicts with :gpus/-l gpus")
+        }
+
+        $has_gpu = 1;
     } elsif ($gpus) {
         push(@command, "--gpus=$gpus");
+        push(@intcommand, '--gpus=0') if $interactive;
+        # apparently, only when --gpus is set (according to man page)
+        push(@command, "--cpus-per-gpu=$cpus_per_gpu") if $cpus_per_gpu;
+        # no equivalent for interactive?
+
+        $has_gpu = 1;
     }
 
     # TODO: handle node resource GPUs too. might/will conflict with node resourfces such as vmem etc etc
     #       needs support in submitfilter too?
     #       This is a way too simple first attempt. needs to be understood how slurm handles these combos
-    # TODO: joltik defaults for now, to be read from vsc-jobs clusterdata
-    $cpus_per_gpu = 8 if !$cpus_per_gpu;
-    push(@command, "--cpus-per-gpu=$cpus_per_gpu") if
-        $gpus || ($res_opts->{naccelerators} && ! $res_opts->{mppnppn});
-
-    $mem_per_gpu = "48G" if !$mem_per_gpu;
-    push(@command, "--mem-per-gpu=".convert_mb_format($mem_per_gpu)) if
-        $gpus || ($res_opts->{naccelerators} && ! ($res_opts->{mem} || $res_opts->{pmem}));
+    my $add_mempergpu = $gpus || ($res_opts->{naccelerators} && ! ($res_opts->{mem} || $res_opts->{pmem}));
+    push(@command, "--mem-per-gpu=".convert_mb_format($mem_per_gpu)) if $mem_per_gpu && $add_mempergpu;
+    push(@intcommand, "--mem-per-gpu=0") if $interactive && $has_gpu;
 
     # Cray-specific options
     push(@command, "--ntasks=$res_opts->{mppwidth}") if $res_opts->{mppwidth};
@@ -1410,11 +1419,11 @@ or more generic X GPUs on Y nodes  C<-l nodes=Y,gpus=X>
 
 =item B<--cpus-per-gpu>
 
-Number of CPUs required per allocated GPU (via the C<-G>/C<--gpus> option). Defaults to 8.
+Number of CPUs required per allocated GPU (via the C<-G>/C<--gpus> option).
 
 =item B<--mem-per-gpu>
 
-Memory required per allocated GPU (via the C<-G>/C<--gpus> option). Defaults to 48GB.
+Memory required per allocated GPU (via the C<-G>/C<--gpus> option).
 
 =back
 
