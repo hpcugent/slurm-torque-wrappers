@@ -308,7 +308,7 @@ sub make_command
         }
         $mode |= INTERACTIVE;
         @command = (which(SALLOC));
-        @intcommand = (which('srun'), '--pty', '--mem-per-cpu=0');
+        @intcommand = (which('srun'), '--pty', '--mpi=none');
         $defaults->{J} = "INTERACTIVE" if exists($defaults->{J});
         $defaults->{'cpu-bind'} = 'none';
 
@@ -418,8 +418,10 @@ sub make_command
 
     if ($res_opts->{mem} && ! $res_opts->{pmem}) {
         push(@command, "--mem=$res_opts->{mem}");
+        push(@intcommand, '--mem=0') if $interactive;
     } elsif ($res_opts->{pmem} && ! $res_opts->{mem}) {
         push(@command, "--mem-per-cpu=$res_opts->{pmem}");
+        push(@intcommand, '--mem-per-cpu=0') if $interactive;
     } elsif ($res_opts->{pmem} && $res_opts->{mem}) {
         fatal("Both mem and pmem defined");
     }
