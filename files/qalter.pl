@@ -150,9 +150,10 @@ sub qalter_main
 
         # use fake=1 to avouid default nodes
         my ($mode, $command, $block, $script, $script_args, $defaults) = make_command(undef, 1);
+        my ($index) = grep { $command->[$_] eq 'srun' } (0 .. @$command-1);
 
         # extract all long options from command
-        my $longopts = {map {$_ =~ m/^--([\w-]+)=(.*)/; $1 => $2} grep {m/^--[\w-]+=/} @$command};
+        my $longopts = {map {$_ =~ m/^--([\w-]+)=(.*)/; $1 => $2} grep {m/^--[\w-]+=/} @$command[0..$index]};
 
         # for certain attributes, convert the values
         my $convert = {
