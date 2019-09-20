@@ -83,8 +83,8 @@ sub qalter_main
             -exitstatus => 153,
             );
     }
-    if ((not defined($new_name)) and (not defined($rerun)) and (not defined($output)) and (not @resource_list) and
-        (not defined($additional_attributes))) {
+    if (not (defined($new_name) or defined($rerun) or defined($output) or @resource_list
+             or defined($additional_attributes))) {
         pod2usage(
             -message => "no argument given!",
             -verbose => 0,
@@ -112,6 +112,11 @@ sub qalter_main
         if ($additional_attributes =~ m/x(?ii)="?ADVRES:([^\r\n\t\f\v "]+)/) {
             $update{reservation} = $1;
             qalter_update(\%update, 'reservation')
+        } else {
+            pod2usage(
+                -message => "Additional attribute $additional_attributes is not supported",
+                -verbose => 0,
+            );
         }
     }
 
@@ -248,6 +253,7 @@ B<qalter> - alter a job name, the job rerun flag or the job output file name.
 qalter [-N Name]
        [-r y|n]
        [-o output file]
+       [-W additional_attribute]
        <job ID>
 
 =head1 DESCRIPTION
