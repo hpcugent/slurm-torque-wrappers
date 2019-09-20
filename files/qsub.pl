@@ -430,15 +430,18 @@ sub make_command
     # TODO: support all/half for both -l gpus and --gpus
     my $has_gpu;
     if ($res_opts->{naccelerators}) {
+        my ($acc, $num) = split(':', $res_opts->{naccelerators});
         if ($gpus) {
-            fatal("You cannot define both :gpus=X/-l gpus=X node resource and the --gpus option")
+            fatal("You cannot define both :$acc=X/-l $acc=X node resource and the --gpus option")
         } else {
-            push(@command, "--gres=gpu:$res_opts->{naccelerators}");
-            push(@intcommand, '--gres=gpu:0') if $interactive;
+            my $gresacc = $acc;
+            $gresacc = 'gpu' if $gresacc eq "gpus";
+            push(@command, "--gres=$gresacc:$num");
+            push(@intcommand, '--gres=$gresacc:0') if $interactive;
         }
 
         if ($cpus_per_gpu) {
-            fatal("--cpus-per-gpu requires --gpus option (and thus conflicts with :gpus/-l gpus")
+            fatal("--cpus-per-gpu requires --gpus option (and thus conflicts with :$acc/-l $acc")
         }
 
         $has_gpu = 1;
@@ -896,6 +899,7 @@ sub parse_resource_list
         'nodes' => "",
         'naccelerators' => "",
         'gpus' => "",  # alias for naccelerators
+        'mps' => "",  # sort-of alias for naccelerators
         'opsys' => "",
         'other' => "",
         'pcput' => "",
@@ -943,19 +947,33 @@ sub parse_resource_list
         $opt{walltime} = get_minutes($opt{walltime});
     }
 
+    if ($opt{naccelerators}) {
+        # these are gpus
+        $opt{naccelerators} = "gpus:$opt{naccelerators}"
+    }
+
+    if ($opt{gpus} && ($opt{naccelerators} || $opt{mps})) {
+        fatal("You cannot specify both gpus and ".($opt{mps} ? 'mps' : 'naccelerators')." as a node resource")
+    }
+
+    if ($opt{mps} && ($opt{naccelerators} || $opt{gpus})) {
+        fatal("You cannot specify both mps and ".($opt{gpus} ? 'gpus' : 'naccelerators')." as a node resource")
+    }
+
     if ($opt{gpus}) {
         # alias for naccelerators
-        if ($opt{naccelerators}) {
-            fatal("You cannot specify both naccelerators and gpus as a node resource")
-        } else {
-            $opt{naccelerators} = delete $opt{gpus};
-        }
+        $opt{naccelerators} = "gpus:" . (delete $opt{gpus});
+    }
+
+    if ($opt{mps}) {
+        # sort-of alias for naccelerators
+        $opt{naccelerators} = "mps:" . (delete $opt{mps});
     }
 
     if ($opt{accelerator} &&
         $opt{accelerator} =~ /^[Tt]/ &&
         !$opt{naccelerators}) {
-        $opt{naccelerators} = 1;
+        $opt{naccelerators} = "gpus:1";
         push(@matches, 'naccelerators');
     }
 
@@ -1043,7 +1061,7 @@ sub parse_all_resource_list
     if ($res_opts->{nodes}) {
         $node_opts = parse_node_opts($res_opts->{nodes});
         my $nacc = delete $node_opts->{nacc};
-        # do not override the ,naccelerators=X with the :gpu=X
+        # do not override the ,naccelerators=X with the :gpus=X
         $res_opts->{naccelerators} = $nacc if $nacc && ! defined($res_opts->{naccelerators});
     }
 
@@ -1079,11 +1097,11 @@ sub parse_node_opts
         $max_ppn = $1 if !$max_ppn || ($1 > $max_ppn);
     }
 
-    while ($node_string =~ /gpus(=(\d+))?/g) {
+    while ($node_string =~ /(gpus|mps)(?:=(\d+))?/g) {
         if ($opt{nacc}) {
-            fatal("No support for (mixed) number of gpus over multiple nodes");
+            fatal("No support for (mixed) number of $1 over multiple nodes");
         } else {
-            $opt{nacc} = $2 || 1;
+            $opt{nacc} = "$1:" . (defined($2) ? "$2" : ($1 eq 'mps' ? 100 : 1));  # set 100 MPS default vs 1 gpu
         }
     }
 
@@ -1095,7 +1113,7 @@ sub parse_node_opts
     foreach my $part (@parts) {
         my @sub_parts = split(/:/, $part);
         foreach my $sub_part (@sub_parts) {
-            if ($sub_part =~ /(ppn=\d+|gpus(=\d+)?)/) {
+            if ($sub_part =~ /(ppn=\d+|(gpus|mps)(=\d+)?)/) {
                 next;
             } elsif ($sub_part =~ /^(\d+)/) {
                 $opt{node_cnt} += $1;

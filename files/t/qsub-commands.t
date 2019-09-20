@@ -34,6 +34,8 @@ my @sa = qw(script arg1);
 my @da = (@sa, qw(-l nodes=2:ppn=4));
 my @gda = (@da);
 $gda[-1] .= ":gpus=2";
+my @mda = (@da);
+$mda[-1] .= ":mps=400";
 my @ga = (@sa, qw(--gpus=3));
 
 # default batch argument string
@@ -64,7 +66,9 @@ my %comms = (
     "$dba --begin=2018-11-21T16:00:00 $dsa", [qw(-a 1600), @da],
 
     "--gres=gpu:2 --mem-per-gpu=123M $dsa", [qw(-l gpus=2 --mem-per-gpu=123M), @sa],
+    "--gres=mps:300 --mem-per-gpu=124M $dsa", [qw(-l mps=300 --mem-per-gpu=124M), @sa],
     "$dba --gres=gpu:2 $dsa", [@gda],
+    "$dba --gres=mps:400 $dsa", [@mda],
     "$dba --mem=2048M --gres=gpu:2 $dsa", [qw(-l vmem=2gb), @gda],
     "--time=5 --gpus=3 --cpus-per-gpu=10 --mem-per-gpu=456M $dsa", [qw(-l walltime=4:4 --cpus-per-gpu=10 --mem-per-gpu=456M), @ga],
     );
