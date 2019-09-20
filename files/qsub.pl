@@ -696,7 +696,7 @@ sub parse_script
     push(@cmd, '--x11') if $set{'X'};
 
     # add reservation
-    if (defined ($set{'W'} && $set{'W'} =~ m/x(?ii)="?ADVRES:([^\r\n\t\f\v "]+)/) {
+    if (defined ($set{'W'}) && $set{'W'} =~ m/x(?ii)="?ADVRES:([^\r\n\t\f\v "]+)/) {
         push(@cmd, '--reservation', $1)
     }
 
