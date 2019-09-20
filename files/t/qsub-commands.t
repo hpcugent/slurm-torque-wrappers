@@ -382,4 +382,26 @@ $txt = "-%a";
 isnt(index($cmdstr, $txt), -1, "Array extension \"$txt\" should be in \"$cmdstr\"");
 isnt(index($newtxt, $txt), -1, "Array extension \"$txt\" should be in \"$newtxt\"");
 
+$stdin = "#!/usr/bin/bash\n#PBS -W x=advres:ReSeV-NAME-directive\necho\n";
+$txt = "--reservation ReSeV-NAME-directive";
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($cmdstr, $txt), -1, "Request for reservation \"$txt\" should be in \"$cmdstr\"");
+
+$stdin = "#!/usr/bin/bash\necho\n";
+@ARGV = ('-W', 'x=ADVRES:ReSeV-NAME-commandline');
+$txt = "ReSeV-NAME-commandline";
+($cmdstr, $newtxt) = pst($stdin);
+isnt(index($ENV{SBATCH_RESERVATION}, $txt), -1, "\$SBATCH_RESERVATION should be \"$txt\"");
+delete $ENV{SBATCH_RESERVATION};
+
+$stdin = "#!/usr/bin/bash\n#PBS -W x=advres:ReSeV-NAME-directive2\necho\n";
+@staticARGV = ('-W', 'x=ADVRES:ReSeV-NAME-commandline2');
+@ARGV = @staticARGV;
+$txt = "--reservation ReSeV-NAME-directive2";
+$txt2 = "ReSeV-NAME-commandline2";
+($cmdstr, $newtxt) = pst($stdin, \@staticARGV);
+is(index($cmdstr, $txt), -1, "Request for reservation \"$txt\" should not be in \"$cmdstr\"");
+isnt(index($ENV{SBATCH_RESERVATION}, $txt2), -1, "\$SBATCH_RESERVATION should be \"$txt2\"");
+delete $ENV{SBATCH_RESERVATION};
+
 done_testing();
