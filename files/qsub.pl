@@ -269,6 +269,10 @@ sub make_command
         my ($name, $value) = split('=', $W);
         if ($name eq 'umask') {
             $ENV{SLURM_UMASK} = $value;
+        } elsif ($name eq 'x') {
+            if ($value =~ m/ADVRES:([^\r\n\t\f\v "]+)/i) {
+                $ENV{SBATCH_RESERVATION} = $1;
+            }
         } elsif ($name eq 'depend') {
             $depend = $value;
         } elsif ($name eq 'group_list') {
@@ -630,7 +634,7 @@ sub parse_script
     # keys are slurm option names
     # Check for -X and -q as well.
     my %orig_argsh = map { s/^-//; $_ => 1 } grep {m/^-.$/} @$orig_args;  # only map the one-letter options, and remove the leading -
-    my @check_pbsopt = qw(j o N X q t);
+    my @check_pbsopt = qw(j o N X q t W);
     push (@check_pbsopt, 'e') if !$orig_argsh{'j'};
     @check_pbsopt = grep {!$orig_argsh{$_}} @check_pbsopt;
     my %map = (
@@ -687,6 +691,11 @@ sub parse_script
 
     # add x11 forward
     push(@cmd, '--x11') if $set{'X'};
+
+    # add reservation
+    if (defined ($set{'W'} && $set{'W'} =~ m/x(?ii)="?ADVRES:([^\r\n\t\f\v "]+)/) {
+        push(@cmd, '--reservation', $1)
+    }
 
     # if -j PBS directive is in the script,
     # do not use default error path for slurm

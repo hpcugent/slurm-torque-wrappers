@@ -26,6 +26,7 @@ sub qalter_main
         @resource_list,
         $output,
         $rerun,
+        $additional_attributes,
         $man,
         $help
         );
@@ -36,6 +37,7 @@ sub qalter_main
         'r=s'    => \$rerun,
         'o=s'    => \$output,
         'l=s'    => \@resource_list,
+        'W=s'    => \$additional_attributes,
         'help|?' => \$help,
         'man'    => \$man
         )
@@ -81,7 +83,8 @@ sub qalter_main
             -exitstatus => 153,
             );
     }
-    if ((not defined($new_name)) and (not defined($rerun)) and (not defined($output)) and (not @resource_list)) {
+    if ((not defined($new_name)) and (not defined($rerun)) and (not defined($output)) and (not @resource_list) and
+        (not defined($additional_attributes))) {
         pod2usage(
             -message => "no argument given!",
             -verbose => 0,
@@ -102,6 +105,14 @@ sub qalter_main
     if ($rerun) {
         $update{requeue} = (($rerun eq "n") || ($rerun eq "N")) ? 1 : 0;
         qalter_update(\%update, 'requeue')
+    }
+
+    # Use Slurm's Perl API to change the reservation
+    if ($additional_attributes) {
+        if ($additional_attributes =~ m/x(?ii)="?ADVRES:([^\r\n\t\f\v "]+)/) {
+            $update{reservation} = $1;
+            qalter_update(\%update, 'reservation')
+        }
     }
 
     # Use Slurm's Perl API to change Comment string
@@ -266,6 +277,10 @@ The job log will be move/rename after the job has B<terminated>.
 =item B<-l>
 
 Alter a job resources.
+
+=item B<-W>
+
+Alter a job additional attribute (only single, comma separated lists are not allowed).
 
 =item B<-?> | B<--help>
 
