@@ -197,7 +197,7 @@ sub main
             $job->{aWDuration} = $job->{statPSUtl};
 
             $job->{allocNodeList} = $job->{nodes} || "--";
-            $job->{stateCode} = stateCode($job->{job_state});
+            $job->{stateCode} = stateCode($job->{job_state}, $job->{state_reason});
             $job->{user_name} = getpwuid($job->{user_id}) || "nobody";
             $job->{name} = "Allocation" if !$job->{name};
 
@@ -255,10 +255,13 @@ sub main
 ################################################################################
 sub stateCode
 {
-    my ($state) = @_;
+    my ($state, $reason) = @_;
 
     if(!defined($state)) {
         return 'U';
+    }
+    if((($state & JOB_STATE_BASE) == JOB_PENDING ) && ( $reason == 2 )) {
+        return 'H';
     }
     switch($state & JOB_STATE_BASE) {
         case [JOB_COMPLETE,
@@ -581,6 +584,8 @@ sub print_job_full
     my $user_group = getgrgid($job->{group_id});
     printf("\tegroup = %s(%d)\n", $user_group, $job->{group_id});
 
+    printf("\tdependency = %s\n", $job->{dependency})
+        if $job->{dependency};
     printf("\tResource_List.walltime = %s\n", hhmmss($job->{time_limit} * 60));
     printf("\tResource_List.nodect = %d\n", $job->{num_nodes})
         if $job->{num_nodes};
