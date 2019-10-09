@@ -260,7 +260,7 @@ sub stateCode
     if(!defined($state)) {
         return 'U';
     }
-    if((($state & JOB_STATE_BASE) == JOB_PENDING ) && ( $reason == WAIT_DEPENDENCY )) {
+    if((($state & JOB_STATE_BASE) == JOB_PENDING ) && defined($reason) && ($reason == WAIT_DEPENDENCY)) {
         return 'H';
     }
     switch($state & JOB_STATE_BASE) {
