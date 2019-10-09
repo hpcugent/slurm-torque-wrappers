@@ -441,7 +441,8 @@ sub make_command
             my $gresacc = $acc;
             $gresacc = 'gpu' if $gresacc eq "gpus";
             push(@command, "--gres=$gresacc:$num");
-            push(@intcommand, '--gres=$gresacc:0') if $interactive;
+            # For now, until magic meaning of gpus=0 is equal that of mem=0, allow all gpus in interactive shell
+            #push(@intcommand, "--gres=$gresacc:0") if $interactive;
         }
 
         if ($cpus_per_gpu) {
