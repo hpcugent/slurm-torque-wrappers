@@ -757,13 +757,13 @@ sub parse_script
         my $arrayext = '-%a';
         for my $element (0 .. $#cmd) {
             foreach my $dir (qw(e o)) {
-                if ($cmd[$element] eq "-$dir" && $cmd[$element+1] !~ m{%a}) {
+                if ($cmd[$element] eq "-$dir" && $cmd[$element+1] !~ m{%\d*a}) {
                     $cmd[$element+1] .= $arrayext;
                 }
             }
         }
         for my $element (0 .. $#newtxt) {
-            if ($newtxt[$element] =~ m/^\s*(#PBS.*?\s-[oe])(?:\s*(\S+)(.*))?$/ && $newtxt[$element] !~ m{%a}) {
+            if ($newtxt[$element] =~ m/^\s*(#PBS.*?\s-[oe])(?:\s*(\S+)(.*))?$/ && $newtxt[$element] !~ m{%\d*a}) {
                 $newtxt[$element] = "$1$2$arrayext$3";
             }
         }
