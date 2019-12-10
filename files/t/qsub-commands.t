@@ -5,6 +5,8 @@ use Test::More;
 use Test::MockModule;
 use Cwd;
 
+use File::Temp qw(tempdir);
+
 my $submitfilter;
 BEGIN {
     # poor mans main mocking
@@ -112,6 +114,7 @@ my $txt = "$sbatch $dba";
 is(join(" ", @$command), $txt, "expected command for submitfilter");
 
 # no match
+diag "no match command ", explain($command), " defaults ", explain($defaults), " no stdin";
 $txt .= " -J script --chdir=$ENV{HOME} -e ".getcwd."/%x.e%A --export=NONE --get-user-env=60L -o ".getcwd."/%x.o%A";
 my ($newtxt, $newcommand) = parse_script('', $command, $defaults);
 is(join(" ", @$newcommand), $txt, "expected command after parse_script without eo");
@@ -121,14 +124,23 @@ is(join(" ", @$newcommand), $txt, "expected command after parse_script without e
 # insert shebang
 {
     local $ENV{SHELL} = '/some/shell';
-    my $stdin = "#\n#PBS -l abd -o stdout.\${PBS_JOBID}..\$PBS_JOBID\n#\n#PBS -e /abc -N def\ncmd\n";
+    my $stdin = "#\n#PBS -l nodes=123 -o stdout.\${PBS_JOBID}..\$PBS_JOBID\n#\n#PBS -e /abc -N def\ncmd\n";
+    diag "replace PBS_JOBID command ", explain($command), " defaults ", explain($defaults), " stdin '$stdin'";
     ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults);
     is(join(" ", @$newcommand),
        "$sbatch --nodes=2 --ntasks=8 --ntasks-per-node=4 --chdir=$ENV{HOME} --export=NONE --get-user-env=60L",
        "expected command after parse_script with eo");
-    is($newtxt, "#!/some/shell\n#\n#PBS -l abd -o ".getcwd."/stdout.%A..%A\n#\n#PBS -e /abc -N def\ncmd\n",
+    is($newtxt, "#!/some/shell\n#\n#SBATCH --nodes=123\n#PBS -o ".getcwd."/stdout.%A..%A\n#\n#PBS -e /abc -N def\ncmd\n",
        "PBS_JOBID replaced");
 }
+
+my $stdin = "#!/bin/something\n#PBS -l nodes=123:ppn=456:gpus=1 -o stdout -l mem=112233\n#\n#PBS -l gpus=2 -l mem=223344 -N def\ncmd\n";
+($newtxt, $newcommand) = parse_script($stdin, $command, $defaults);
+diag "replace PBS resource directives stdin '$stdin' newtxt '$newtxt'";
+is($newtxt,
+   "#!/bin/something\n#SBATCH --nodes=123 --ntasks=56088 --ntasks-per-node=456 --mem=0.107033729553223M --gres=gpu:1\n".
+   "#PBS -o ".getcwd."/stdout\n#\n#SBATCH --mem=0.212997436523438M --gres=gpu:2\n#PBS -N def\ncmd\n",
+   "replaced PBS resource directives with SBATCH ones");
 
 =head1 interactive job
 
@@ -179,13 +191,15 @@ is($count, 1, "exactly one --chdir found: $count");
 sub pst
 {
     my ($stdin, $static_ARGV) = @_;
+    diag "pst stdin '$stdin' static_argv ", explain $static_ARGV;
     my ($mode, $command, $block, $script, $script_args, $defaults, $destination) = make_command();
     my ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults, $static_ARGV, $destination);
     my $txt = join(' ', @$newcommand);
+    diag "pst return command txt '$txt' newscript\n$newtxt";
     return $txt, $newtxt;
 }
 
-my $stdin = "#\n#PBS -j oe\ncmd\n";
+$stdin = "#\n#PBS -j oe\ncmd\n";
 $txt = " -e ";
 ($cmdstr, $newtxt) = pst($stdin);
 is(index($cmdstr, $txt), -1, "With -j directive, \"$txt\" argument should not be in: $cmdstr");
@@ -244,30 +258,42 @@ sub check_eo_test {
             $comm_or_std_txt = "directive";
         }
         if (index($comm_or_std, "-$oore dir_${comm_or_std_txt}_dir") != -1) {
-            isnt(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/"), -1, "$outorerr should be in dir_${comm_or_std_txt}_dir directory\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+            isnt(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/"), -1,
+                 "$outorerr should be in dir_${comm_or_std_txt}_dir directory\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
             if (index($commandline, "-N") != -1 ) {
-                isnt(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/commandline_name"), -1, "Name of the file should be taken form command line\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
-                is(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/directive_name"), -1, "Name of the file should be taken form command line, not from directive\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+                isnt(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/commandline_name"), -1,
+                     "Name of the file should be taken form command line\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+                is(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/directive_name"), -1,
+                   "Name of the file should be taken form command line, not from directive\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
             } else {
                 if (index($stdin, "-N") != -1 ) {
-                isnt(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/%x"), -1, "Name of the file should be handled by Slurm\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+                    isnt(index($cmdstr, "-$oore $getcwd/dir_${comm_or_std_txt}_dir/%x"), -1,
+                         "Name of the file should be handled by Slurm\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
                 }
             }
         }
     };
     if (index($commandline, "-$oore") != -1) {
-        is(index($cmdstr, "-$oore $getcwd/directive"), -1, "If -$oore in commandline defined, then -$oore directive should be ignored\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+        is(index($cmdstr, "-$oore $getcwd/directive"), -1,
+           "If -$oore in commandline defined, then -$oore directive should be ignored\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
         if (index($commandline, "-$oore commandline") != -1) {
-            isnt(index($cmdstr, "-$oore $getcwd/commandline"), -1, "$outorerr name should be commandline\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+            isnt(index($cmdstr, "-$oore $getcwd/commandline"), -1,
+                 "$outorerr name should be commandline\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
         }
         &$name_check("commandline");
     } else {
         if (index($stdin, "-$oore directive") != -1) {
-            is(index($cmdstr, "-$oore $getcwd/directive"), -1, "$outorerr name handled by slurm plugin\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+            is(index($cmdstr, "-$oore $getcwd/directive"), -1,
+               "$outorerr name handled by slurm plugin\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
         }
         &$name_check("stdin");
     }
 }
+
+# run this in a tempdir
+my $here = getcwd;
+my $tempdir = tempdir( CLEANUP => 1 );
+chdir($tempdir);
 
 my @commandlines = generate("%s %s %s %s", "commandline");
 my @stdins = generate("#!/bin/bash\n#PBS %s\n#PBS %s\n#PBS %s\n#PBS %s\ncmd\n", "directive");
@@ -279,20 +305,28 @@ for my $commandline (@commandlines) {
         ($cmdstr, $newtxt) = pst($stdin, \@static_ARGV);
         check_eo_test($commandline, $stdin, $cmdstr, $getcwd, "o");
         if (index($commandline, "-j oe") != -1 || index($stdin, "-j oe") != -1) {
-            is(index($cmdstr, "-e "), -1, "If -j command line option or directive is defined, -e should not be defined\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+            is(index($cmdstr, "-e "), -1,
+               "If -j command line option or directive is defined, -e should not be defined\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
         } else {
             check_eo_test($commandline, $stdin, $cmdstr, $getcwd, "e");
         }
         if (index($commandline, "-N") != -1 ) {
-            isnt(index($cmdstr, "-J commandline_name"), -1, "Name should be taken form command line\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
-            is(index($cmdstr, "-J directive_name"), -1, "Name should be taken form command line, not from directives\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+            isnt(index($cmdstr, "-J commandline_name"), -1,
+                 "Name should be taken form command line\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+            is(index($cmdstr, "-J directive_name"), -1,
+               "Name should be taken form command line, not from directives\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
         } else {
             if (index($stdin, "-N") != -1 ) {
-            is(index($cmdstr, "-J directive_name"), -1, "Name is handled by Slurm\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
+                is(index($cmdstr, "-J directive_name"), -1,
+                   "Name is handled by Slurm\ncommandline: $commandline\nstdin: $stdin\ncmdstr: $cmdstr\n");
             }
         }
     };
 };
+
+# change back
+chdir($here);
+
 
 $stdin = "";
 $txt = "--x11";
@@ -403,5 +437,6 @@ $txt2 = "ReSeV-NAME-commandline2";
 is(index($cmdstr, $txt), -1, "Request for reservation \"$txt\" should not be in \"$cmdstr\"");
 isnt(index($ENV{SBATCH_RESERVATION}, $txt2), -1, "\$SBATCH_RESERVATION should be \"$txt2\"");
 delete $ENV{SBATCH_RESERVATION};
+
 
 done_testing();
