@@ -960,7 +960,6 @@ sub parse_resource_list
         'mppmem' => "",
         'mppnodes' => "",
         );
-    my @keys = keys(%opt);
 
     # The select option uses a ":" separator rather than ","
     # This wrapper currently does not support multiple select options
@@ -972,8 +971,18 @@ sub parse_resource_list
     # TODO: why is this here? breaks e.g. :ppn=... structure
     #$rl =~ s/:/,/g;
 
+    my %typos = (
+        gpu => 'gpus (with s)',
+        ppn => 'nodes=X:ppn=Y (: separated)',
+    );
+
+    foreach my $key (sort keys %typos) {
+        fatal("Possible typo detected: $key -> should be $typos{$key} (in '$rl')")
+            if $rl =~ m/(^|,|\s)$key(=|\s|$)/;
+    }
+
     my @matches;
-    foreach my $key (@keys) {
+    foreach my $key (sort keys %opt) {
         ($opt{$key}) = $rl =~ m/\b$key=([\w:.=+]+)/;
         push(@matches, $key) if defined($opt{$key});
     }
@@ -1134,6 +1143,18 @@ sub parse_node_opts
         'task_cnt' => 0,
         'nacc' => 0,
         );
+
+    my %typos = (
+        gpu => 'gpus (with s)',
+        pn => 'ppn',
+        pppn => 'ppn',
+    );
+
+    foreach my $key (sort keys %typos) {
+        fatal("Possible typo detected: $key -> should be $typos{$key} (in '$node_string')")
+            if $node_string =~ m/(^|:)$key(=|\s|$)/;
+    }
+
     my $max_ppn;
     while ($node_string =~ /ppn=(\d+)/g) {
         $opt{task_cnt} += $1;
@@ -1185,9 +1206,8 @@ sub parse_pe_opts
     my %opt = (
         'shm' => 0,
         );
-    my @keys = keys(%opt);
 
-    foreach my $key (@keys) {
+    foreach my $key (sort keys %opt) {
         $opt{$key} = $pe_array[1] if ($key eq $pe_array[0]);
     }
 
