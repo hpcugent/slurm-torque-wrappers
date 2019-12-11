@@ -61,6 +61,14 @@ foreach my $resctxt (sort keys %resc) {
     is_deeply($mat, $resc{$resctxt}->[1], "converted rescource list '$resctxt' matches");
 }
 
+foreach my $wrong (qw(nodes=1,ppn=2,gpus nodes=1:ppn=2,gpu gpu gpu=7)) {
+    local $@;
+    eval {
+        parse_resource_list($wrong);
+    };
+    ok($@, "exit called with message for $wrong");
+}
+
 =head1 parse_node_opts
 
 =cut
@@ -81,6 +89,15 @@ foreach my $notxt (sort keys %nopts) {
     diag "resource '$notxt' ", explain $nodes;
     is_deeply($nodes, $nopts{$notxt}, "converted node option '$notxt'");
 }
+
+foreach my $wrong (qw(1:gpu 2:gpu=4 3:pn=2 4:pppn=7)) {
+    local $@;
+    eval {
+        parse_node_opts($wrong);
+    };
+    ok($@, "exit called with message for $wrong");
+}
+
 
 =head1 split_variables
 

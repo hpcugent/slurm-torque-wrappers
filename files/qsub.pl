@@ -61,6 +61,7 @@ use List::Util qw(first);
 use Carp;
 use Cwd;
 
+
 BEGIN {
     sub which
     {
@@ -608,7 +609,7 @@ sub parse_script
         PBS_O_SHELL => 'SHELL',
         PBS_O_WORKDIR => 'PWD',
     );
-    #Add all local varibales to @replace_script_vars
+    # Add all local variables to @replace_script_vars
     foreach my $existing_env_vars (sort keys %ENV) {
         $replace_script_vars{$existing_env_vars} = $existing_env_vars;
     };
@@ -628,9 +629,38 @@ sub parse_script
             $line =~ s/\$\{?PBS_JOBID\}?/%A/g;
         }
 
-        if ($line !~ m/^\s*#PBS.*?\s-q/) {
-            push(@newtxt, $line);
-        }
+        # Brute force approach to handle eg resources like gpus
+        # No need to care about the default, resources should not have those
+        # Resources should also not have whitespace in them
+        if ($line =~ m/^\s*\#PBS\s.*-l\s/) {
+            use Test::More;
+            my $fakescript = "fakescript";
+
+            # add all -l options as argv
+            my @pbsresources = $line =~ m/(-l)\s+(\S+)(?:\s|$)/g;
+            local @ARGV = @pbsresources;
+            push (@ARGV, $fakescript);
+            # force no submitfilter
+            # 2nd element is the command
+            my @parsed = make_command();
+            diag "line '$line' parsed ", explain \@parsed;
+            my $lcommand = $parsed[1];
+            if ($lcommand->[0] eq SBATCH && $lcommand->[$#$lcommand] eq "fakescript") {
+                # remove the values from the line at the end
+                # add it as SBATCH directive here
+                push(@newtxt, "#SBATCH ".join(" ", @{$lcommand}[1..$#$lcommand-1]));
+            } else {
+                fatal("Contact the admins: something went wrong processing line '$line', returned ".Dumper($lcommand))
+            };
+        };
+
+        # remove -q or -l and value (but nothing else)
+        # do this on a copy
+        my $newline = $line;
+        $newline =~ s/\s+-[ql]\s+\S+//g;
+
+        # no need to add empty directive lines (could be empty from the substitutions)
+        push(@newtxt, $newline) if $newline !~ m/^\s*#PBS\s*$/;
     };
 
     # Look for PBS directives o, -e, -N, -j if they not given in the command line
@@ -646,19 +676,22 @@ sub parse_script
         V => ['export', 'get-user-env'],
         );
     my %set;
+
+
     foreach my $line (@lines) {
         last if $line !~ m/^\s*(#|$)/;
         # oset and eset on separate line, in case -e and -o are on same line,
         # mixed with otehr opts etc etc
         foreach my $pbsopt (@check_pbsopt) {
             my $opts = $map{$pbsopt} || [$pbsopt];
-            my $pat = $pbsopt eq 'X' ? '^\s*#PBS.*?\s-('.$pbsopt.')' : '^\s*#PBS.*?\s-'.$pbsopt.'\s+(\S+)\s*';
+            my $pat = '^\s*#PBS\s(?:.+?\s)?-' . ($pbsopt eq 'X' ? '('.$pbsopt.')' : $pbsopt.'\s+(\S+)\s*');
             if ($line =~ m/$pat/) {
                 foreach my $opt (@$opts) {
                     $set{$opt} = $1
                 };
             }
         }
+
     };
 
     # handle queues and special queues (as a partition)
@@ -694,11 +727,11 @@ sub parse_script
     }
 
     # add x11 forward
-    push(@cmd, '--x11') if $set{'X'};
+    push(@cmd, '--x11') if ($set{'X'} && ! grep {$_ eq '--x11'} @cmd);
 
     # add reservation
     if (defined ($set{'W'}) && $set{'W'} =~ m/x(?ii)="?ADVRES:([^\r\n\t\f\v "]+)/) {
-        push(@cmd, '--reservation', $1)
+        push(@cmd, '--reservation', $1) if ! grep {$_ =~ m/^--reservation/} @cmd;
     }
 
     # if -j PBS directive is in the script,
@@ -717,13 +750,13 @@ sub parse_script
 
     # check wheter the -o and -e directives are directory
     # if yes, then set the path for slurm.
-    foreach my $dir (@check_eo) {
-        unless (grep (/^-$dir$/, @cmd)) {
-            if ($set{$dir}) {
-                if (-d $set{$dir}) {
-                    my $fname = $defaults->{$dir};
+    foreach my $output (@check_eo) {
+        unless (grep (/^-$output$/, @cmd)) {
+            if ($set{$output}) {
+                if (-d $set{$output}) {
+                    my $fname = $defaults->{$output};
                     $fname =~s /\S*(\/\S*)/$1/s;
-                    push(@cmd, ("-$dir", $set{$dir}.$fname));
+                    push(@cmd, ("-$output", $set{$output}.$fname));
                 }
             }
         }
@@ -756,8 +789,8 @@ sub parse_script
     if ($orig_argsh{t} || $set{t}) {
         my $arrayext = '-%a';
         for my $element (0 .. $#cmd) {
-            foreach my $dir (qw(e o)) {
-                if ($cmd[$element] eq "-$dir" && $cmd[$element+1] !~ m{%\d*a}) {
+            foreach my $output (qw(e o)) {
+                if ($cmd[$element] eq "-$output" && $cmd[$element+1] !~ m{%\d*a}) {
                     $cmd[$element+1] .= $arrayext;
                 }
             }
@@ -927,7 +960,6 @@ sub parse_resource_list
         'mppmem' => "",
         'mppnodes' => "",
         );
-    my @keys = keys(%opt);
 
     # The select option uses a ":" separator rather than ","
     # This wrapper currently does not support multiple select options
@@ -939,8 +971,18 @@ sub parse_resource_list
     # TODO: why is this here? breaks e.g. :ppn=... structure
     #$rl =~ s/:/,/g;
 
+    my %typos = (
+        gpu => 'gpus (with s)',
+        ppn => 'nodes=X:ppn=Y (: separated)',
+    );
+
+    foreach my $key (sort keys %typos) {
+        fatal("Possible typo detected: $key -> should be $typos{$key} (in '$rl')")
+            if $rl =~ m/(^|,|\s)$key(=|\s|$)/;
+    }
+
     my @matches;
-    foreach my $key (@keys) {
+    foreach my $key (sort keys %opt) {
         ($opt{$key}) = $rl =~ m/\b$key=([\w:.=+]+)/;
         push(@matches, $key) if defined($opt{$key});
     }
@@ -1101,6 +1143,18 @@ sub parse_node_opts
         'task_cnt' => 0,
         'nacc' => 0,
         );
+
+    my %typos = (
+        gpu => 'gpus (with s)',
+        pn => 'ppn',
+        pppn => 'ppn',
+    );
+
+    foreach my $key (sort keys %typos) {
+        fatal("Possible typo detected: $key -> should be $typos{$key} (in '$node_string')")
+            if $node_string =~ m/(^|:)$key(=|\s|$)/;
+    }
+
     my $max_ppn;
     while ($node_string =~ /ppn=(\d+)/g) {
         $opt{task_cnt} += $1;
@@ -1152,9 +1206,8 @@ sub parse_pe_opts
     my %opt = (
         'shm' => 0,
         );
-    my @keys = keys(%opt);
 
-    foreach my $key (@keys) {
+    foreach my $key (sort keys %opt) {
         $opt{$key} = $pe_array[1] if ($key eq $pe_array[0]);
     }
 
