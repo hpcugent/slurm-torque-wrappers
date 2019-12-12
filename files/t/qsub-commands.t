@@ -36,6 +36,8 @@ my @sa = qw(script arg1);
 my @da = (@sa, qw(-l nodes=2:ppn=4));
 my @gda = (@da);
 $gda[-1] .= ":gpus=2";
+my @gda3 = (@da);
+$gda3[-1] .= ":gpus=3";
 my @mda = (@da);
 $mda[-1] .= ":mps=400";
 my @ga = (@sa, qw(--gpus=3));
@@ -69,9 +71,11 @@ my %comms = (
 
     "--gres=gpu:2 --mem-per-gpu=123M $dsa", [qw(-l gpus=2 --mem-per-gpu=123M), @sa],
     "--gres=mps:300 --mem-per-gpu=124M $dsa", [qw(-l mps=300 --mem-per-gpu=124M), @sa],
-    "$dba --gres=gpu:2 $dsa", [@gda],
-    "$dba --gres=mps:400 $dsa", [@mda],
-    "$dba --mem=2048M --gres=gpu:2 $dsa", [qw(-l vmem=2gb), @gda],
+    "$dba --gres=gpu:2 --cpus-per-gpu=2 $dsa", [@gda],
+    # 3 gpus, 4ppn -> with ceil, 2 cpus per gpu, so 6 tasks per node also total tasks should go up
+    "--nodes=2 --ntasks=12 --ntasks-per-node=6 --gres=gpu:3 --cpus-per-gpu=2 $dsa", [@gda3],
+    "$dba --gres=mps:400 --cpus-per-gpu=1 $dsa", [@mda],
+    "$dba --mem=2048M --gres=gpu:2 --cpus-per-gpu=2 $dsa", [qw(-l vmem=2gb), @gda],
     "--time=5 --gpus=3 --cpus-per-gpu=10 --mem-per-gpu=456M $dsa", [qw(-l walltime=4:4 --cpus-per-gpu=10 --mem-per-gpu=456M), @ga],
     );
 
@@ -138,7 +142,7 @@ my $stdin = "#!/bin/something\n#PBS -l nodes=123:ppn=456:gpus=1 -o stdout -l mem
 ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults);
 diag "replace PBS resource directives stdin '$stdin' newtxt '$newtxt'";
 is($newtxt,
-   "#!/bin/something\n#SBATCH --nodes=123 --ntasks=56088 --ntasks-per-node=456 --mem=0.107033729553223M --gres=gpu:1\n".
+   "#!/bin/something\n#SBATCH --nodes=123 --ntasks=56088 --ntasks-per-node=456 --mem=0.107033729553223M --gres=gpu:1 --cpus-per-gpu=456\n".
    "#PBS -o ".getcwd."/stdout\n#\n#SBATCH --mem=0.212997436523438M --gres=gpu:2\n#PBS -N def\ncmd\n",
    "replaced PBS resource directives with SBATCH ones");
 
