@@ -60,7 +60,7 @@ use IPC::Run qw(run);
 use List::Util qw(first);
 use Carp;
 use Cwd;
-
+use POSIX qw(ceil);
 
 BEGIN {
     sub which
@@ -361,11 +361,22 @@ sub make_command
     push(@command, "-J", $job_name) if $job_name;
 
     push(@command, "--nodes=$node_opts->{node_cnt}") if $node_opts->{node_cnt};
-    push(@command, "--ntasks=$node_opts->{task_cnt}") if $node_opts->{task_cnt};
+    my $ntasks_idx;
+    if ($node_opts->{task_cnt}) {
+        push(@command, "--ntasks=$node_opts->{task_cnt}");
+        $ntasks_idx = $#command;
+    };
+
     push(@command, "--nodelist=$node_opts->{hostlist}") if $node_opts->{hostlist};
 
     push(@command, "--mincpus=$res_opts->{ncpus}") if $res_opts->{ncpus};
-    push(@command, "--ntasks-per-node=$res_opts->{mppnppn}")  if $res_opts->{mppnppn};
+
+    my $ntasks_per_node_idx;
+    if ($res_opts->{mppnppn}) {
+        push(@command, "--ntasks-per-node=$res_opts->{mppnppn}");
+        $ntasks_per_node_idx = $#command;
+    };
+
     push(@command, '--x11') if $x11forward;
 
     if ($workdir) {
@@ -436,6 +447,9 @@ sub make_command
     my $has_gpu;
     if ($res_opts->{naccelerators}) {
         my ($acc, $num) = split(':', $res_opts->{naccelerators});
+        # assume mps is in percentage (but that is a configuration choice)
+        my $accnum = $acc eq 'mps' ? ceil($num / 100) : $num;
+
         if ($gpus) {
             fatal("You cannot define both :$acc=X/-l $acc=X node resource and the --gpus option")
         } else {
@@ -446,20 +460,43 @@ sub make_command
             #push(@intcommand, "--gres=$gresacc:0") if $interactive;
         }
 
-        if ($cpus_per_gpu) {
-            fatal("--cpus-per-gpu requires --gpus option (and thus conflicts with :$acc/-l $acc")
+        # in gres gpu mode, we will force cpus-per-gpu over whatever ppn is requesting
+        # this only works in directives where both gpu and nodes/ppn is specified in the same line
+        #   we do not pass the known global state around, so parsing only -l gpus=X might give wrong cpus_per_gpu / ppn
+        if ($res_opts->{mppnppn}) {
+            if (!defined($cpus_per_gpu)) {
+                $cpus_per_gpu = ceil($res_opts->{mppnppn} / $accnum);
+            }
+
+            # recompute the mppnppn to match the cpus-per-gpu
+            my $ppn = $cpus_per_gpu * $accnum;
+            if ($res_opts->{mppnppn} != $ppn) {
+                warn("Changing ppn value from $res_opts->{mppnppn} to $ppn due to $num gpu(s) and $cpus_per_gpu cores per gpu");
+                $command[$ntasks_per_node_idx] = "--ntasks-per-node=$ppn";
+
+                # new total task count, from number of nodes time tasks per node.
+                # no need to warn user about a change
+                my $ntasks = $ppn * ($node_opts->{node_cnt} || 1);
+                $command[$ntasks_idx] = "--ntasks=$ntasks";
+            }
+
         }
 
         $has_gpu = 1;
     } elsif ($gpus) {
         push(@command, "--gpus=$gpus");
         push(@intcommand, '--gpus=0') if $interactive;
-        # apparently, only when --gpus is set (according to man page)
-        push(@command, "--cpus-per-gpu=$cpus_per_gpu") if $cpus_per_gpu;
-        # no equivalent for interactive?
+
+        if ($res_opts->{mppnppn} || $node_opts->{node_cnt}) {
+            fatal("Combining --gpus with e.g. -l nodes=X[:ppn=Y] is not supported (use -l gpus=Z / :gpus=Z instead)");
+        }
 
         $has_gpu = 1;
     }
+
+    # no equivalent cfr mem=0 magic for interactive?
+    push(@command, "--cpus-per-gpu=$cpus_per_gpu") if $has_gpu && $cpus_per_gpu;
+
 
     # TODO: handle node resource GPUs too. might/will conflict with node resourfces such as vmem etc etc
     #       needs support in submitfilter too?
