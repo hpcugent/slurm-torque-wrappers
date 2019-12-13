@@ -670,7 +670,6 @@ sub parse_script
         # No need to care about the default, resources should not have those
         # Resources should also not have whitespace in them
         if ($line =~ m/^\s*\#PBS\s.*-l\s/) {
-            use Test::More;
             my $fakescript = "fakescript";
 
             # add all -l options as argv
@@ -680,7 +679,6 @@ sub parse_script
             # force no submitfilter
             # 2nd element is the command
             my @parsed = make_command();
-            diag "line '$line' parsed ", explain \@parsed;
             my $lcommand = $parsed[1];
             if ($lcommand->[0] eq SBATCH && $lcommand->[$#$lcommand] eq "fakescript") {
                 # remove the values from the line at the end
