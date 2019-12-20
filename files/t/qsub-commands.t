@@ -128,13 +128,13 @@ is(join(" ", @$newcommand), $txt, "expected command after parse_script without e
 # insert shebang
 {
     local $ENV{SHELL} = '/some/shell';
-    my $stdin = "#\n#PBS -l nodes=123 -o stdout.\${PBS_JOBID}..\$PBS_JOBID\n#\n#PBS -e /abc -N def\ncmd\n";
+    my $stdin = "#\n#PBS -l nodes=123 -o stdout.\${PBS_JOBID}..\$PBS_JOBID\n#\n#PBS -e /abc -N def\ncmd -l foo -x bar\n";
     diag "replace PBS_JOBID command ", explain($command), " defaults ", explain($defaults), " stdin '$stdin'";
     ($newtxt, $newcommand) = parse_script($stdin, $command, $defaults);
     is(join(" ", @$newcommand),
        "$sbatch --nodes=2 --ntasks=8 --ntasks-per-node=4 --chdir=$ENV{HOME} --export=NONE --get-user-env=60L",
        "expected command after parse_script with eo");
-    is($newtxt, "#!/some/shell\n#\n#SBATCH --nodes=123\n#PBS -o ".getcwd."/stdout.%A..%A\n#\n#PBS -e /abc -N def\ncmd\n",
+    is($newtxt, "#!/some/shell\n#\n#SBATCH --nodes=123\n#PBS -o ".getcwd."/stdout.%A..%A\n#\n#PBS -e /abc -N def\ncmd -l foo -x bar\n",
        "PBS_JOBID replaced");
 }
 
