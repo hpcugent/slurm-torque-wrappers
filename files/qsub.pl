@@ -689,10 +689,12 @@ sub parse_script
             };
         };
 
-        # remove -q or -l and value (but nothing else)
+        # remove -q or -l and value from #PBS header lines (but nothing else)
         # do this on a copy
         my $newline = $line;
-        $newline =~ s/\s+-[ql]\s+\S+//g;
+        if ($line =~ m/^\s*\#PBS/) {
+            $newline =~ s/\s+-[ql]\s+\S+//g;
+        }
 
         # no need to add empty directive lines (could be empty from the substitutions)
         push(@newtxt, $newline) if $newline !~ m/^\s*#PBS\s*$/;
