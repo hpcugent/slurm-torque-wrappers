@@ -15,7 +15,7 @@
 Summary: Slurm wrappers scripts with torque 6 support
 Name: slurm-torque-wrappers
 Version: 0.3.11
-Release: 1
+Release: 2
 
 Group: Applications/System
 License: GNU Public License v 2.0
