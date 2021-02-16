@@ -87,7 +87,7 @@ use constant SALLOC => which("salloc");
 use constant INTERACTIVE => 1 << 1;
 use constant DRYRUN => 1 << 2;
 
-use constant TORQUE_CFGS => qw(/var/spool/pbs/torque.cfg /var/spool/torque/torque.cfg);
+use constant TORQUE_CFGS => qw(/var/spool/pbs/torque.cfg /var/spool/torque/torque.cfg /etc/submitfilter.cfg);
 use constant DEFAULT_SHELL => '/bin/bash';
 
 # there's some strange bug that resets HOME and USER and TERM
